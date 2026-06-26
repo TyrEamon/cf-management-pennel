@@ -42,6 +42,8 @@ type ZoneRef = {
   name: string;
 };
 
+const MAX_PAGES_DOMAIN_PROJECTS_PER_SYNC = 20;
+
 export async function syncAssetsForProfile(
   env: Env,
   profileId: string,
@@ -164,7 +166,7 @@ async function syncPages(context: ScannerContext): Promise<void> {
     projectsStartedAt,
   );
 
-  for (const projectName of projectNames) {
+  for (const projectName of projectNames.slice(0, MAX_PAGES_DOMAIN_PROJECTS_PER_SYNC)) {
     try {
       const domains = await context.client.listPagesDomains(
         context.profile.account_id,

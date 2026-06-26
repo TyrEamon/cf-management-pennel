@@ -67,7 +67,12 @@ export class CloudflareClient {
   listR2Buckets(accountId: string): Promise<CfRecord[]> {
     return this.request<{ buckets?: unknown }>(
       `/accounts/${encodeURIComponent(accountId)}/r2/buckets`,
-    ).then((result) => toRecordArray(result.buckets));
+    )
+      .then((result) => toRecordArray(result.buckets))
+      .catch((error: unknown) => {
+        if (isR2NotEnabledError(error)) return [];
+        throw error;
+      });
   }
 
   listD1Databases(accountId: string): Promise<CfRecord[]> {
@@ -234,6 +239,21 @@ function toRecordArray(value: unknown): CfRecord[] {
 
 function isRecord(value: unknown): value is CfRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isR2NotEnabledError(error: unknown): boolean {
+  if (!(error instanceof CloudflareApiError)) return false;
+  if (error.httpStatus !== 400 && error.httpStatus !== 403 && error.httpStatus !== 404) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return message.includes("r2") && (
+    message.includes("enable") ||
+    message.includes("activat") ||
+    message.includes("subscr") ||
+    message.includes("not entitled") ||
+    message.includes("not available")
+  );
 }
 
 function sleep(ms: number): Promise<void> {

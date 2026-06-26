@@ -69,6 +69,21 @@ v0.1-CF 先做 Cloudflare 原生部署的只读资产盘点：
 
 注意：`ADMIN_API_TOKEN` 是本面板自己的后台登录口令，不是 Cloudflare API Token；Cloudflare Profile 里填写的才是 Cloudflare API Token。
 
+## 自动同步与账号数量
+
+创建/导入账号时只会保存 Profile，不会立刻同步资产。同步有两种方式：
+
+- 手动同步：在详情页点击 `同步该账号`，或在首页触发全部同步。
+- 自动同步：线上 Worker 配置了 cron，当前为每天 UTC 03:15 自动把所有启用账号加入同步队列。
+
+为了避免 Cloudflare Workers 单次调用的子请求数量超限，队列消费者设置为一次只处理 1 个账号：
+
+```jsonc
+"max_batch_size": 1
+```
+
+8-15 个账号属于轻量规模，建议保持低频同步：每天自动同步一次即可，平时需要看最新数据时再手动同步单个账号。R2 没有开通的账号不需要为了本项目订阅 R2；系统会把它当成暂无 R2 bucket 处理。
+
 ## 技术路线
 
 ```text

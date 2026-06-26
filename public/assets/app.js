@@ -651,6 +651,7 @@ function permissionTable(rows) {
 function permissionHint(row) {
   if (row.status === "permission_denied") return "Token 缺少对应权限或权限层级不匹配";
   if (row.status === "network_error") return "请求或返回解析失败";
+  if (row.check_key === "r2.buckets.list" && row.status === "empty_resource") return "R2 未开通或暂无 bucket，不影响其他资产同步";
   if (row.status === "empty_resource") return "接口可访问，但没有找到资源";
   return "—";
 }

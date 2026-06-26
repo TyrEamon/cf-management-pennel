@@ -37,12 +37,12 @@
     "consumers": [
       {
         "queue": "cf-asset-hub-sync",
-        "max_batch_size": 5,
-        "max_batch_timeout": 30
+        "max_batch_size": 1,
+        "max_batch_timeout": 10
       }
     ]
   },
   "triggers": {
-    "crons": ["0 */6 * * *"]
+    "crons": ["15 3 * * *"]
   }
 }

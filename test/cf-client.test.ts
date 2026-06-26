@@ -39,10 +39,25 @@ describe("CloudflareClient", () => {
       }),
     );
   });
+
+  it("treats an account without R2 enabled as an empty bucket list", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      jsonResponse({
+        success: false,
+        errors: [{ code: 10001, message: "R2 is not enabled for this account" }],
+        messages: [],
+        result: null,
+      }, { status: 403 }),
+    ));
+
+    const client = new CloudflareClient(env, "token");
+    await expect(client.listR2Buckets("account-id")).resolves.toEqual([]);
+  });
 });
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
+    ...init,
     headers: { "content-type": "application/json" },
   });
 }
