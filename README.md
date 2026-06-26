@@ -40,6 +40,35 @@ v0.1-CF 先做 Cloudflare 原生部署的只读资产盘点：
 - 全局搜索资源属于哪个账号
 - 记录同步状态和错误
 
+## Cloudflare API Token 权限
+
+在 Cloudflare Dashboard 创建 Profile 时，需要填入该账号的 `Account ID` 和一个只读 API Token。推荐使用 **Create Custom Token** 创建专用令牌，不要使用 Global API Key。
+
+当前版本只做资产盘点，不会修改 Cloudflare 资源。Token 建议配置为只读：
+
+| 权限范围 | 权限组 | 级别 | 用途 |
+| --- | --- | --- | --- |
+| Zone | Zone | Read | 读取 Zone/域名列表，用于统计域名归属 |
+| Account | Workers Scripts | Read | 读取 Worker 脚本列表 |
+| Account | Cloudflare Pages | Read | 读取 Pages 项目和自定义域名 |
+| Account | R2 Storage | Read | 读取 R2 bucket 列表 |
+| Account | D1 | Read | 读取 D1 数据库列表 |
+| Account | Workers KV Storage | Read | 读取 KV namespace 列表 |
+
+资源范围建议：
+
+- `Account Resources`：选择 `Include -> Specific account -> 目标账号`。
+- `Zone Resources`：选择 `Include -> All zones`，或者只选择你想纳入盘点的 zones。
+- 如果某类资产你不需要看，可以不授予对应权限；页面会在权限检测里显示该项失败或为空，其他模块仍会继续同步。
+
+隐私版不需要、也不建议授予这些权限：
+
+- `Zone / DNS / Read`：不会读取 DNS 记录，避免源站 IP、解析目标等敏感信息入库。
+- `Account / Workers Routes / Read` 或类似 Worker 路由权限：不会读取 Worker 路由。
+- 任何 `Edit` / `Write` / `Delete` 权限：本项目当前不需要写权限。
+
+注意：`ADMIN_API_TOKEN` 是本面板自己的后台登录口令，不是 Cloudflare API Token；Cloudflare Profile 里填写的才是 Cloudflare API Token。
+
 ## 技术路线
 
 ```text
