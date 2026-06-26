@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { encryptToken } from "../crypto/token-crypto";
-import { ProfileRepository } from "../repositories/profiles.repo";
+import { ProfileRepository, toPublicProfile } from "../repositories/profiles.repo";
 import { runAndStorePermissionChecks } from "../scanner/permission-checker";
 import { enqueueProfileSync } from "../scanner/sync-queue";
 
@@ -18,6 +18,11 @@ const createProfileSchema = z.object({
 });
 
 const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  accountId: z.string().min(1).optional(),
+  emailHint: z.string().email().optional().nullable(),
+  note: z.string().optional().nullable(),
+  apiToken: z.string().min(10).optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -67,16 +72,40 @@ profilesRoute.get("/:id", async (c) => {
 });
 
 profilesRoute.patch("/:id", async (c) => {
+  const id = c.req.param("id");
   const payload = updateProfileSchema.parse(await c.req.json());
-  if (payload.enabled === undefined) {
-    return c.json({ error: "No supported fields provided" }, 400);
+  const repo = new ProfileRepository(c.env.DB);
+  await repo.getRequired(id);
+
+  const update: Parameters<ProfileRepository["update"]>[1] = {};
+  if (payload.name !== undefined) update.name = payload.name;
+  if (payload.accountId !== undefined) update.accountId = payload.accountId;
+  if (payload.emailHint !== undefined) update.emailHint = payload.emailHint;
+  if (payload.note !== undefined) update.note = payload.note;
+  if (payload.apiToken) {
+    update.encryptedToken = await encryptToken(
+      payload.apiToken,
+      c.env.APP_MASTER_KEY_BASE64,
+    );
   }
 
-  const profile = await new ProfileRepository(c.env.DB).updateEnabled(
-    c.req.param("id"),
-    payload.enabled,
-  );
-  return c.json({ data: profile });
+  if (Object.keys(update).length > 0) {
+    await repo.update(id, update);
+  }
+  if (payload.enabled !== undefined) {
+    await repo.updateEnabled(id, payload.enabled);
+  }
+
+  const row = await repo.getRequired(id);
+  return c.json({ data: toPublicProfile(row) });
+});
+
+profilesRoute.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const repo = new ProfileRepository(c.env.DB);
+  await repo.getRequired(id);
+  await repo.delete(id);
+  return c.json({ data: { id, deleted: true } });
 });
 
 profilesRoute.post("/:id/test", async (c) => {

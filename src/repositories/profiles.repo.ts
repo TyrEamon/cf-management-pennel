@@ -10,6 +10,34 @@ export type CreateProfileInput = {
   encryptedToken: EncryptedToken;
 };
 
+export type UpdateProfileInput = {
+  name?: string;
+  accountId?: string;
+  emailHint?: string | null;
+  note?: string | null;
+  encryptedToken?: EncryptedToken;
+};
+
+// profile_id 外键关联的所有子表，删除账号时按依赖顺序清理
+const CHILD_TABLES = [
+  "sync_errors",
+  "sync_jobs",
+  "profile_permission_checks",
+  "cf_accounts",
+  "dns_records",
+  "worker_routes",
+  "zones",
+  "workers",
+  "pages_domains",
+  "pages_projects",
+  "r2_buckets",
+  "d1_databases",
+  "kv_namespaces",
+  "asset_links",
+  "search_index",
+  "issues",
+] as const;
+
 export class ProfileRepository {
   constructor(private readonly db: D1Database) {}
 
@@ -101,6 +129,46 @@ export class ProfileRepository {
       )
       .bind(status, lastSyncAt ?? null, new Date().toISOString(), id)
       .run();
+  }
+
+  async update(id: string, input: UpdateProfileInput): Promise<PublicProfile> {
+    const sets: string[] = [];
+    const binds: unknown[] = [];
+
+    if (input.name !== undefined) { sets.push("name = ?"); binds.push(input.name); }
+    if (input.accountId !== undefined) { sets.push("account_id = ?"); binds.push(input.accountId); }
+    if (input.emailHint !== undefined) { sets.push("email_hint = ?"); binds.push(input.emailHint); }
+    if (input.note !== undefined) { sets.push("note = ?"); binds.push(input.note); }
+    if (input.encryptedToken) {
+      sets.push("token_ciphertext = ?", "token_iv = ?", "token_auth_tag = ?", "token_hint = ?");
+      binds.push(
+        input.encryptedToken.ciphertext,
+        input.encryptedToken.iv,
+        input.encryptedToken.authTag,
+        input.encryptedToken.hint,
+      );
+    }
+
+    if (sets.length > 0) {
+      sets.push("updated_at = ?");
+      binds.push(new Date().toISOString(), id);
+      await this.db
+        .prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`)
+        .bind(...binds)
+        .run();
+    }
+
+    return toPublicProfile(await this.getRequired(id));
+  }
+
+  async delete(id: string): Promise<void> {
+    const statements = CHILD_TABLES.map((table) =>
+      this.db.prepare(`DELETE FROM ${table} WHERE profile_id = ?`).bind(id),
+    );
+    statements.push(
+      this.db.prepare("DELETE FROM profiles WHERE id = ?").bind(id),
+    );
+    await this.db.batch(statements);
   }
 }
 

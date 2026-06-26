@@ -14,11 +14,12 @@ const state = {
   detail: null,
   detailProfile: null,
   assetTab: "zones",
+  editId: null,
 };
 
 const ASSET_TABS = [
   ["zones", "域名"], ["dnsRecords", "DNS"], ["workers", "Workers"], ["workerRoutes", "路由"],
-  ["pagesProjects", "Pages"], ["pagesDomains", "Pages 域名"], ["r2Buckets", "R2"],
+  ["pagesProjects", "Pages"], ["r2Buckets", "R2"],
   ["d1Databases", "D1"], ["kvNamespaces", "KV"], ["permissionChecks", "权限"],
 ];
 
@@ -71,6 +72,8 @@ function bind() {
   $("searchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch().catch(showError); });
 
   $("profileForm").addEventListener("submit", (e) => { e.preventDefault(); addProfile().catch(showError); });
+  $("editForm").addEventListener("submit", (e) => { e.preventDefault(); saveEdit(); });
+  document.querySelectorAll("[data-edit-close]").forEach((b) => b.addEventListener("click", closeEdit));
 
   // 外观设置
   $("bgApply").addEventListener("click", () => { appearance.image = $("bgUrl").value.trim(); applyAppearance(); saveAppearance(); });
@@ -474,8 +477,10 @@ async function loadIssues() {
 }
 
 /* ---------------- 账号管理 ---------------- */
+let manageProfiles = [];
 async function loadManage() {
   const profiles = await api("/api/profiles");
+  manageProfiles = profiles;
   $("manageCount").textContent = String(profiles.length);
   if (!profiles.length) { $("manageList").innerHTML = empty("还没有账号。"); return; }
   $("manageList").innerHTML = profiles.map((p) => `
@@ -487,18 +492,66 @@ async function loadManage() {
       </div>
       <div class="acc-actions">
         <button class="btn xs" data-m-view="${esc(p.id)}" type="button">资产</button>
+        <button class="btn xs" data-m-edit="${esc(p.id)}" type="button">编辑</button>
         <button class="btn xs" data-m-test="${esc(p.id)}" type="button">测试</button>
         <button class="btn xs" data-m-sync="${esc(p.id)}" type="button">同步</button>
         <button class="btn xs" data-m-toggle="${esc(p.id)}" data-en="${p.enabled ? 1 : 0}" type="button">${p.enabled ? "停用" : "启用"}</button>
+        <button class="btn xs danger" data-m-del="${esc(p.id)}" type="button">删除</button>
       </div>
     </div>`).join("");
   document.querySelectorAll("[data-m-view]").forEach((b) => b.addEventListener("click", () => openDetail(b.dataset.mView).catch(showError)));
+  document.querySelectorAll("[data-m-edit]").forEach((b) => b.addEventListener("click", () => openEdit(b.dataset.mEdit)));
   document.querySelectorAll("[data-m-test]").forEach((b) => b.addEventListener("click", () => testProfile(b.dataset.mTest).catch(showError)));
   document.querySelectorAll("[data-m-sync]").forEach((b) => b.addEventListener("click", () => syncProfile(b.dataset.mSync).catch(showError)));
   document.querySelectorAll("[data-m-toggle]").forEach((b) => b.addEventListener("click", async () => {
     await api(`/api/profiles/${b.dataset.mToggle}`, { method: "PATCH", body: JSON.stringify({ enabled: b.dataset.en !== "1" }) });
     loadManage().catch(showError);
   }));
+  document.querySelectorAll("[data-m-del]").forEach((b) => b.addEventListener("click", () => deleteProfile(b.dataset.mDel).catch(showError)));
+}
+
+function openEdit(id) {
+  const p = manageProfiles.find((x) => x.id === id);
+  if (!p) return;
+  state.editId = id;
+  $("editName").value = p.name || "";
+  $("editAccountId").value = p.accountId || "";
+  $("editEmail").value = p.emailHint || "";
+  $("editNote").value = p.note || "";
+  $("editToken").value = "";
+  $("editError").classList.add("hidden");
+  $("editModal").classList.remove("hidden");
+  setTimeout(() => $("editName").focus(), 50);
+}
+function closeEdit() { $("editModal").classList.add("hidden"); state.editId = null; }
+
+async function saveEdit() {
+  if (!state.editId) return;
+  const body = {
+    name: $("editName").value.trim(),
+    accountId: $("editAccountId").value.trim(),
+    emailHint: $("editEmail").value.trim() || null,
+    note: $("editNote").value.trim() || null,
+  };
+  const token = $("editToken").value.trim();
+  if (token) body.apiToken = token;
+  try {
+    await api(`/api/profiles/${state.editId}`, { method: "PATCH", body: JSON.stringify(body) });
+    closeEdit();
+    showNotice(`账号「${body.name}」已更新。`);
+    loadManage().catch(showError);
+  } catch (e) {
+    const box = $("editError"); box.textContent = e.message; box.classList.remove("hidden");
+  }
+}
+
+async function deleteProfile(id) {
+  const p = manageProfiles.find((x) => x.id === id);
+  const name = p ? p.name : id;
+  if (!confirm(`确认删除账号「${name}」？\n该账号同步到的所有资产数据也会一并清除，此操作不可恢复。`)) return;
+  await api(`/api/profiles/${id}`, { method: "DELETE" });
+  showNotice(`账号「${name}」已删除。`);
+  loadManage().catch(showError);
 }
 
 async function addProfile() {

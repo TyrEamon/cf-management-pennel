@@ -124,6 +124,8 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 .btn.ghost:hover { background: var(--orange-soft); box-shadow: none; }
 .btn.sm { padding: 6px 12px; font-size: 13px; }
 .btn.xs { padding: 4px 9px; font-size: 12px; border-radius: 8px; }
+.btn.danger { color: #ef4444; border-color: color-mix(in srgb, #ef4444 30%, var(--border)); }
+.btn.danger:hover { background: rgba(239,68,68,0.1); border-color: #ef4444; }
 
 /* ---------- 布局 ---------- */
 .content { max-width: 1180px; margin: 0 auto; padding: 28px; }
@@ -352,6 +354,10 @@ body[data-auth="admin"] .public-only { display: none !important; }
 .login-error.hidden { display: none; }
 .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
 .modal-actions .btn { flex: 1; }
+.modal-card.edit-card { text-align: left; max-width: 460px; }
+.modal-card.edit-card h2 { text-align: center; margin-bottom: 16px; }
+.modal-card.edit-card .form textarea { min-height: 64px; }
+.modal-card.edit-card .modal-actions { grid-column: 1 / -1; }
 
 /* ===================================================================
    背景图 + 透明度（外观设置）

@@ -233,6 +233,26 @@
     </div>
   </div>
 
+  <!-- 编辑账号弹窗 -->
+  <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal-backdrop" data-edit-close></div>
+    <div class="modal-card edit-card">
+      <h2 id="editTitle">编辑账号</h2>
+      <form id="editForm" class="form">
+        <label>账号名称<input id="editName" required placeholder="主账号 / 客户 A / 备用"></label>
+        <label>Account ID<input id="editAccountId" required placeholder="Cloudflare account id"></label>
+        <label>邮箱提示<input id="editEmail" type="email" placeholder="可选"></label>
+        <label>备注<input id="editNote" placeholder="这个账号负责什么"></label>
+        <label class="wide">API Token<textarea id="editToken" placeholder="留空＝不修改原 Token；填入则替换"></textarea></label>
+        <div id="editError" class="login-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn" type="button" data-edit-close>取消</button>
+          <button class="btn primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/assets/app.js" defer></script>
 </body>
 </html>
