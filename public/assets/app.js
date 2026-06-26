@@ -29,6 +29,7 @@ const $ = (id) => document.getElementById(id);
 document.addEventListener("DOMContentLoaded", () => {
   bind();
   applyTheme(localStorage.getItem("cfah_theme") || "light");
+  applyAppearance();
   if (state.token) {
     // 验证已存口令是否仍有效，否则回落到前台
     tryToken(state.token).catch(() => enterPublic());
@@ -45,7 +46,14 @@ function bind() {
   });
   $("themeLight").addEventListener("click", () => applyTheme("light"));
   $("themeDark").addEventListener("click", () => applyTheme("dark"));
-  $("refreshBtn").addEventListener("click", () => refresh().catch(showError));
+  $("refreshBtn").addEventListener("click", () => {
+    const b = $("refreshBtn");
+    b.classList.remove("spinning");
+    void b.offsetWidth;            // 重置动画
+    b.classList.add("spinning");
+    b.addEventListener("animationend", () => b.classList.remove("spinning"), { once: true });
+    refresh().catch(showError);
+  });
 
   $("loginBtn").addEventListener("click", openLogin);
   document.querySelectorAll(".public-login").forEach((b) => b.addEventListener("click", openLogin));
@@ -63,7 +71,61 @@ function bind() {
   $("searchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch().catch(showError); });
 
   $("profileForm").addEventListener("submit", (e) => { e.preventDefault(); addProfile().catch(showError); });
+
+  // 外观设置
+  $("bgApply").addEventListener("click", () => { appearance.image = $("bgUrl").value.trim(); applyAppearance(); saveAppearance(); });
+  $("bgUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") { appearance.image = $("bgUrl").value.trim(); applyAppearance(); saveAppearance(); } });
+  $("bgClear").addEventListener("click", () => { appearance.image = ""; $("bgUrl").value = ""; applyAppearance(); saveAppearance(); });
+  $("bgImgOpacity").addEventListener("input", (e) => { appearance.imgOpacity = +e.target.value; applyAppearance(); saveAppearance(); });
+  $("bgMaskOpacity").addEventListener("input", (e) => { appearance.maskOpacity = +e.target.value; applyAppearance(); saveAppearance(); });
+  $("cardOpacity").addEventListener("input", (e) => { appearance.cardOpacity = +e.target.value; applyAppearance(); saveAppearance(); });
+  $("bgReset").addEventListener("click", resetAppearance);
 }
+
+/* ---------------- 外观设置 ---------------- */
+const APPEARANCE_KEY = "cfah_appearance";
+const APPEARANCE_DEFAULT = { image: "", imgOpacity: 100, maskOpacity: 45, cardOpacity: 100 };
+let appearance = { ...APPEARANCE_DEFAULT, ...readAppearance() };
+
+function readAppearance() {
+  try { return JSON.parse(localStorage.getItem(APPEARANCE_KEY) || "{}"); } catch { return {}; }
+}
+function saveAppearance() { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); }
+
+function applyAppearance() {
+  const root = document.documentElement;
+  if (appearance.image) {
+    document.body.classList.add("has-bg");
+    root.style.setProperty("--bg-image", `url("${cssUrl(appearance.image)}")`);
+  } else {
+    document.body.classList.remove("has-bg");
+    root.style.removeProperty("--bg-image");
+  }
+  root.style.setProperty("--bg-image-opacity", String(appearance.imgOpacity / 100));
+  root.style.setProperty("--bg-mask-opacity", String(appearance.maskOpacity / 100));
+  root.style.setProperty("--card-pct", `${appearance.cardOpacity}%`);
+  syncAppearanceControls();
+}
+
+function syncAppearanceControls() {
+  if (!$("bgUrl")) return;
+  $("bgUrl").value = appearance.image || "";
+  $("bgImgOpacity").value = appearance.imgOpacity;
+  $("bgMaskOpacity").value = appearance.maskOpacity;
+  $("cardOpacity").value = appearance.cardOpacity;
+  $("valImg").textContent = `${appearance.imgOpacity}%`;
+  $("valMask").textContent = `${appearance.maskOpacity}%`;
+  $("valCard").textContent = `${appearance.cardOpacity}%`;
+}
+
+function resetAppearance() {
+  appearance = { ...APPEARANCE_DEFAULT };
+  applyAppearance();
+  saveAppearance();
+}
+
+// 防止 url() 注入破坏 CSS
+function cssUrl(s) { return String(s).replace(/["\\)]/g, encodeURIComponent); }
 
 /* ---------------- 主题 ---------------- */
 function applyTheme(theme) {
@@ -137,6 +199,7 @@ function go(view) {
   if (view === "sync") loadSync().catch(showError);
   if (view === "issues") loadIssues().catch(showError);
   if (view === "manage") loadManage().catch(showError);
+  if (view === "appearance") syncAppearanceControls();
 }
 
 function refresh() {
@@ -179,8 +242,8 @@ async function loadPublic() {
 function renderPublicCards(accounts) {
   $("cardCount").textContent = String(accounts.length);
   if (!accounts.length) { $("cardGrid").innerHTML = empty("暂无账号数据。"); return; }
-  $("cardGrid").innerHTML = accounts.map((a) => `
-    <div class="card locked">
+  $("cardGrid").innerHTML = accounts.map((a, i) => `
+    <div class="card locked" style="--i:${i}">
       <div class="card-top">
         <div style="min-width:0">
           <div class="card-title">
@@ -234,18 +297,18 @@ function renderCards() {
     $("cardGrid").innerHTML = empty(state.summaries.length ? "没有匹配的账号。" : "还没有账号，去「账号管理」添加一个。");
     return;
   }
-  $("cardGrid").innerHTML = list.map(cardHtml).join("");
+  $("cardGrid").innerHTML = list.map((p, i) => cardHtml(p, i)).join("");
   document.querySelectorAll("[data-card]").forEach((el) => {
     el.addEventListener("click", () => openDetail(el.dataset.card).catch(showError));
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") openDetail(el.dataset.card).catch(showError); });
   });
 }
 
-function cardHtml(p) {
+function cardHtml(p, i = 0) {
   const c = p.counts;
   const st = p.enabled ? (p.latestSyncStatus || p.status || "unknown") : "disabled";
   return `
-    <div class="card" data-card="${esc(p.id)}" role="button" tabindex="0">
+    <div class="card" data-card="${esc(p.id)}" role="button" tabindex="0" style="--i:${i}">
       <div class="card-top">
         <div style="min-width:0">
           <div class="card-title">

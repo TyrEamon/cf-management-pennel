@@ -30,6 +30,7 @@
         <button class="navlink" data-nav="sync" type="button">同步</button>
         <button class="navlink" data-nav="issues" type="button">异常</button>
         <button class="navlink" data-nav="manage" type="button">账号管理</button>
+        <button class="navlink" data-nav="appearance" type="button">外观</button>
       </nav>
 
       <div class="topbar-actions">
@@ -155,6 +156,61 @@
           <section class="panel">
             <div class="panel-head"><h2>账号列表</h2><span id="manageCount" class="count">0</span></div>
             <div id="manageList"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 外观设置（后台） ============ -->
+      <section id="view-appearance" class="view">
+        <div class="page-head">
+          <div><h1>外观设置</h1><p class="muted">自定义背景与透明度，设置仅保存在当前浏览器。</p></div>
+          <button id="bgReset" class="btn" type="button">恢复默认</button>
+        </div>
+        <div class="appearance-grid">
+          <section class="panel">
+            <div class="panel-head"><h2>背景图片</h2><span class="chip">本地保存</span></div>
+            <div class="appearance-body">
+              <div class="bg-field">
+                <input id="bgUrl" class="bg-url" type="url" placeholder="https://…/wallpaper.jpg 粘贴图片直链">
+                <button id="bgApply" class="btn primary sm" type="button">应用</button>
+                <button id="bgClear" class="btn sm" type="button">清除</button>
+              </div>
+
+              <label class="slider">
+                <span class="slider-label">背景透明度 <b id="valImg">100%</b></span>
+                <input id="bgImgOpacity" type="range" min="0" max="100" value="100">
+              </label>
+              <label class="slider">
+                <span class="slider-label">背景遮罩 <b id="valMask">45%</b></span>
+                <input id="bgMaskOpacity" type="range" min="0" max="100" value="45">
+              </label>
+              <label class="slider">
+                <span class="slider-label">卡片不透明度 <b id="valCard">100%</b></span>
+                <input id="cardOpacity" type="range" min="30" max="100" value="100">
+              </label>
+
+              <p class="muted hint">背景透明度＝背景图本身的明显程度；背景遮罩＝盖在图上的暗色蒙版，越高越暗、文字越清晰；卡片不透明度越低越透出背景。</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>预览</h2></div>
+            <div class="appearance-body">
+              <div class="card" style="cursor:default">
+                <div class="card-top">
+                  <div>
+                    <div class="card-title"><span class="sdot ok"></span><span class="card-name">示例账号</span></div>
+                    <div class="card-acc">实时预览卡片效果</div>
+                  </div>
+                  <span class="tag ok">正常</span>
+                </div>
+                <div class="card-metrics">
+                  <div class="metric"><div class="metric-val">12</div><div class="metric-lbl">域名</div></div>
+                  <div class="metric"><div class="metric-val">5</div><div class="metric-lbl">Workers</div></div>
+                  <div class="metric"><div class="metric-val">3</div><div class="metric-lbl">Pages</div></div>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
       </section>
