@@ -39,10 +39,7 @@
       </nav>
 
       <div class="topbar-actions">
-        <div class="theme-toggle" role="group" aria-label="主题">
-          <button id="themeLight" class="theme-btn" type="button" title="日间">☀</button>
-          <button id="themeDark" class="theme-btn" type="button" title="夜间">☾</button>
-        </div>
+        <button id="themeToggle" class="icon-btn theme-single" type="button" title="切换主题" aria-label="切换主题">☾</button>
         <button id="refreshBtn" class="icon-btn" type="button" title="刷新">↻</button>
         <button id="loginBtn" class="btn primary sm public-only" type="button">登录后台</button>
         <div class="session admin-only">
@@ -87,6 +84,15 @@
 
         <div class="section-row">
           <h2>账号 <span id="cardCount" class="count">0</span></h2>
+          <div id="cardColumnControl" class="column-control" aria-label="卡片列数">
+            <span class="column-label">列数</span>
+            <button class="column-btn" type="button" data-cols="auto">自适应</button>
+            <button class="column-btn mobile-col" type="button" data-cols="1">1</button>
+            <button class="column-btn mobile-col" type="button" data-cols="2">2</button>
+            <button class="column-btn" type="button" data-cols="3">3</button>
+            <button class="column-btn desktop-col" type="button" data-cols="4">4</button>
+            <button class="column-btn desktop-col" type="button" data-cols="5">5</button>
+          </div>
         </div>
         <div id="cardGrid" class="card-grid"></div>
       </section>

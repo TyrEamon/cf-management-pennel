@@ -17,6 +17,9 @@ const state = {
   editId: null,
 };
 
+const CARD_COLUMNS_KEY = "cfah_card_columns";
+let cardColumnPrefs = readCardColumnPrefs();
+
 const ASSET_TABS = [
   ["zones", "域名"], ["workers", "Workers"],
   ["pagesProjects", "Pages"], ["r2Buckets", "R2"],
@@ -30,6 +33,7 @@ const $ = (id) => document.getElementById(id);
 document.addEventListener("DOMContentLoaded", () => {
   bind();
   applyTheme(localStorage.getItem("cfah_theme") || "light");
+  applyCardColumns();
   applyAppearance();
   loadPublicAppearance().catch(() => {});
   if (state.token) {
@@ -46,8 +50,7 @@ function bind() {
     el.addEventListener("click", () => go(el.dataset.nav));
     if (el.tabIndex === 0) el.addEventListener("keydown", (e) => { if (e.key === "Enter") go(el.dataset.nav); });
   });
-  $("themeLight").addEventListener("click", () => applyTheme("light"));
-  $("themeDark").addEventListener("click", () => applyTheme("dark"));
+  $("themeToggle").addEventListener("click", toggleTheme);
   $("refreshBtn").addEventListener("click", () => {
     const b = $("refreshBtn");
     b.classList.remove("spinning");
@@ -68,6 +71,8 @@ function bind() {
   $("syncAllSync").addEventListener("click", () => syncAll().catch(showError));
   $("globalSearchFromHome").addEventListener("click", () => go("search"));
   $("cardFilter").addEventListener("input", renderCards);
+  document.querySelectorAll("[data-cols]").forEach((b) => b.addEventListener("click", () => setCardColumns(b.dataset.cols)));
+  window.matchMedia("(max-width: 640px)").addEventListener("change", applyCardColumns);
 
   $("runSearch").addEventListener("click", () => runSearch().catch(showError));
   $("searchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch().catch(showError); });
@@ -185,12 +190,75 @@ function resetAppearance() {
 // 防止 url() 注入破坏 CSS
 function cssUrl(s) { return String(s).replace(/["\\)]/g, encodeURIComponent); }
 
+/* ---------------- 卡片列数 ---------------- */
+function readCardColumnPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CARD_COLUMNS_KEY) || "{}");
+    return {
+      desktop: validColumnValue(saved.desktop, false),
+      mobile: validColumnValue(saved.mobile, true),
+    };
+  } catch {
+    return { desktop: "auto", mobile: "auto" };
+  }
+}
+
+function validColumnValue(value, mobile) {
+  if (value === "auto") return "auto";
+  const allowed = mobile ? ["1", "2", "3"] : ["3", "4", "5"];
+  return allowed.includes(String(value)) ? String(value) : "auto";
+}
+
+function isMobileColumns() {
+  return window.matchMedia("(max-width: 640px)").matches;
+}
+
+function currentColumnMode() {
+  return isMobileColumns() ? "mobile" : "desktop";
+}
+
+function setCardColumns(value) {
+  const mode = currentColumnMode();
+  cardColumnPrefs = {
+    ...cardColumnPrefs,
+    [mode]: validColumnValue(value, mode === "mobile"),
+  };
+  localStorage.setItem(CARD_COLUMNS_KEY, JSON.stringify(cardColumnPrefs));
+  applyCardColumns();
+}
+
+function applyCardColumns() {
+  const grid = $("cardGrid");
+  if (!grid) return;
+  const mode = currentColumnMode();
+  const value = validColumnValue(cardColumnPrefs[mode], mode === "mobile");
+  if (value === "auto") {
+    grid.removeAttribute("data-columns");
+    grid.style.removeProperty("--card-columns");
+  } else {
+    grid.dataset.columns = value;
+    grid.style.setProperty("--card-columns", value);
+  }
+  document.querySelectorAll("[data-cols]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.cols === value);
+  });
+}
+
 /* ---------------- 主题 ---------------- */
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("cfah_theme", theme);
-  $("themeLight").classList.toggle("active", theme === "light");
-  $("themeDark").classList.toggle("active", theme === "dark");
+  const button = $("themeToggle");
+  if (!button) return;
+  const dark = theme === "dark";
+  button.textContent = dark ? "☀" : "☾";
+  button.title = dark ? "切换为日间" : "切换为夜间";
+  button.setAttribute("aria-label", button.title);
 }
 
 /* ---------------- 登录 / 退出 ---------------- */
@@ -300,7 +368,7 @@ async function loadPublic() {
 
 function renderPublicCards(accounts) {
   $("cardCount").textContent = String(accounts.length);
-  if (!accounts.length) { $("cardGrid").innerHTML = empty("暂无账号数据。"); return; }
+  if (!accounts.length) { $("cardGrid").innerHTML = empty("暂无账号数据。"); applyCardColumns(); return; }
   $("cardGrid").innerHTML = accounts.map((a, i) => `
     <div class="card locked" style="--i:${i}">
       <div class="card-top">
@@ -323,6 +391,7 @@ function renderPublicCards(accounts) {
         <span class="mini">资产合计 <b>${num(a.totalAssets)}</b></span>
       </div>
     </div>`).join("");
+  applyCardColumns();
 }
 
 /* ---------------- 后台总览 ---------------- */
@@ -354,9 +423,11 @@ function renderCards() {
   $("cardCount").textContent = String(list.length);
   if (!list.length) {
     $("cardGrid").innerHTML = empty(state.summaries.length ? "没有匹配的账号。" : "还没有账号，去「账号管理」添加一个。");
+    applyCardColumns();
     return;
   }
   $("cardGrid").innerHTML = list.map((p, i) => cardHtml(p, i)).join("");
+  applyCardColumns();
   document.querySelectorAll("[data-card]").forEach((el) => {
     el.addEventListener("click", () => openDetail(el.dataset.card).catch(showError));
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") openDetail(el.dataset.card).catch(showError); });
