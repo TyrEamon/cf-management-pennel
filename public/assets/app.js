@@ -1,45 +1,40 @@
 /* ===================================================================
    Cloudflare 资产中心 — 前端 SPA
-   数据来源：/api/assets/overview, /api/assets/profiles/:id,
-            /api/search, /api/sync, /api/issues, /api/profiles
+   两态：
+     · public（未登录）— 仅 /api/public/overview，打码汇总，只读
+     · admin（已登录）— 全部 /api/* 明细与控制
    =================================================================== */
 
 const state = {
   token: sessionStorage.getItem("cfah_admin_token") || "",
+  authed: false,
   view: "home",
-  summaries: [],        // 账号汇总（含计数）
-  overview: {},         // 全局聚合
-  detail: null,         // 当前详情数据
-  detailProfile: null,  // 当前详情对应的账号汇总
+  overview: {},
+  summaries: [],
+  detail: null,
+  detailProfile: null,
   assetTab: "zones",
 };
 
 const ASSET_TABS = [
-  ["zones", "域名"],
-  ["dnsRecords", "DNS"],
-  ["workers", "Workers"],
-  ["workerRoutes", "路由"],
-  ["pagesProjects", "Pages"],
-  ["pagesDomains", "Pages 域名"],
-  ["r2Buckets", "R2"],
-  ["d1Databases", "D1"],
-  ["kvNamespaces", "KV"],
-  ["permissionChecks", "权限"],
+  ["zones", "域名"], ["dnsRecords", "DNS"], ["workers", "Workers"], ["workerRoutes", "路由"],
+  ["pagesProjects", "Pages"], ["pagesDomains", "Pages 域名"], ["r2Buckets", "R2"],
+  ["d1Databases", "D1"], ["kvNamespaces", "KV"], ["permissionChecks", "权限"],
 ];
 
-// 概览统计：值由 overview 聚合派生（见 renderStats）
 const STATS = ["账号", "域名", "Workers", "Pages", "资产合计", "异常"];
 
 const $ = (id) => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", () => {
   bind();
-  $("adminToken").value = state.token;
   applyTheme(localStorage.getItem("cfah_theme") || "light");
-  updateLock();
-  go("home");
-  if (state.token) refresh().catch(showError);
-  else showNotice("输入 Admin Token 解锁面板。");
+  if (state.token) {
+    // 验证已存口令是否仍有效，否则回落到前台
+    tryToken(state.token).catch(() => enterPublic());
+  } else {
+    enterPublic();
+  }
 });
 
 /* ---------------- 事件绑定 ---------------- */
@@ -51,8 +46,13 @@ function bind() {
   $("themeLight").addEventListener("click", () => applyTheme("light"));
   $("themeDark").addEventListener("click", () => applyTheme("dark"));
   $("refreshBtn").addEventListener("click", () => refresh().catch(showError));
-  $("unlockBtn").addEventListener("click", unlock);
-  $("adminToken").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock(); });
+
+  $("loginBtn").addEventListener("click", openLogin);
+  document.querySelectorAll(".public-login").forEach((b) => b.addEventListener("click", openLogin));
+  $("logoutBtn").addEventListener("click", logout);
+  $("loginSubmit").addEventListener("click", () => doLogin().catch(showError));
+  $("loginInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin().catch(showError); });
+  document.querySelectorAll("[data-login-close]").forEach((b) => b.addEventListener("click", closeLogin));
 
   $("syncAllHome").addEventListener("click", () => syncAll().catch(showError));
   $("syncAllSync").addEventListener("click", () => syncAll().catch(showError));
@@ -65,7 +65,7 @@ function bind() {
   $("profileForm").addEventListener("submit", (e) => { e.preventDefault(); addProfile().catch(showError); });
 }
 
-/* ---------------- 主题 / 会话 ---------------- */
+/* ---------------- 主题 ---------------- */
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("cfah_theme", theme);
@@ -73,41 +73,81 @@ function applyTheme(theme) {
   $("themeDark").classList.toggle("active", theme === "dark");
 }
 
-function unlock() {
-  state.token = $("adminToken").value.trim();
-  sessionStorage.setItem("cfah_admin_token", state.token);
-  updateLock();
-  hideNotice();
-  refresh().catch(showError);
+/* ---------------- 登录 / 退出 ---------------- */
+function openLogin() {
+  $("loginError").classList.add("hidden");
+  $("loginInput").value = "";
+  $("loginModal").classList.remove("hidden");
+  setTimeout(() => $("loginInput").focus(), 50);
+}
+function closeLogin() { $("loginModal").classList.add("hidden"); }
+
+async function doLogin() {
+  const pw = $("loginInput").value.trim();
+  if (!pw) return;
+  try {
+    await tryToken(pw);
+    closeLogin();
+  } catch (e) {
+    state.token = "";
+    const msg = /unauthorized|401/i.test(e.message) ? "口令错误，请重试。" : e.message;
+    const box = $("loginError"); box.textContent = msg; box.classList.remove("hidden");
+  }
 }
 
-function updateLock() {
-  $("sessionDot").className = "dot " + (state.token ? "unlocked" : "locked");
+// 用候选口令拉一次受保护接口验证；成功即进入后台
+async function tryToken(token) {
+  state.token = token;
+  const data = await api("/api/assets/overview");
+  sessionStorage.setItem("cfah_admin_token", token);
+  state.authed = true;
+  state.overview = data.overview || {};
+  state.summaries = data.profileSummaries || [];
+  enterAdmin();
+}
+
+function logout() {
+  state.token = "";
+  state.authed = false;
+  sessionStorage.removeItem("cfah_admin_token");
+  enterPublic();
+}
+
+function enterPublic() {
+  state.authed = false;
+  document.body.dataset.auth = "public";
+  hideNotice();
+  go("home");
+}
+function enterAdmin() {
+  document.body.dataset.auth = "admin";
+  hideNotice();
+  go("home");
 }
 
 /* ---------------- 视图切换 ---------------- */
 function go(view) {
+  if (!state.authed && view !== "home") { openLogin(); return; }
   state.view = view;
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
   document.querySelectorAll(".navlink").forEach((n) => n.classList.toggle("active", n.dataset.nav === view));
   window.scrollTo({ top: 0, behavior: "smooth" });
-  if (!state.token) return;
-  if (view === "home") loadHome().catch(showError);
+
+  if (view === "home") { (state.authed ? loadHome() : loadPublic()).catch(showError); return; }
   if (view === "sync") loadSync().catch(showError);
   if (view === "issues") loadIssues().catch(showError);
   if (view === "manage") loadManage().catch(showError);
 }
 
 function refresh() {
-  if (!state.token) { showNotice("请先解锁。"); return Promise.resolve(); }
-  hideNotice();
   if (state.view === "detail" && state.detailProfile) return openDetail(state.detailProfile.id);
-  return go(state.view), Promise.resolve();
+  go(state.view);
+  return Promise.resolve();
 }
 
-/* ---------------- API ---------------- */
+/* ---------------- 请求 ---------------- */
 async function api(path, options = {}) {
-  if (!state.token) throw new Error("需要 Admin Token。");
+  if (!state.token) throw new Error("需要登录。");
   const res = await fetch(path, {
     ...options,
     headers: {
@@ -121,7 +161,49 @@ async function api(path, options = {}) {
   return payload.data ?? payload;
 }
 
-/* ---------------- 总览 ---------------- */
+async function publicGet(path) {
+  const res = await fetch(path);
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(payload.error || res.statusText);
+  return payload.data ?? payload;
+}
+
+/* ---------------- 前台（公开） ---------------- */
+async function loadPublic() {
+  const data = await publicGet("/api/public/overview");
+  state.overview = data.overview || {};
+  renderStats();
+  renderPublicCards(data.accounts || []);
+}
+
+function renderPublicCards(accounts) {
+  $("cardCount").textContent = String(accounts.length);
+  if (!accounts.length) { $("cardGrid").innerHTML = empty("暂无账号数据。"); return; }
+  $("cardGrid").innerHTML = accounts.map((a) => `
+    <div class="card locked">
+      <div class="card-top">
+        <div style="min-width:0">
+          <div class="card-title">
+            <span class="sdot ${a.enabled ? "ok" : "disabled"}"></span>
+            <span class="card-name masked">${esc(a.maskedName)}</span>
+          </div>
+          <div class="card-acc">🔒 明细需登录</div>
+        </div>
+        ${a.hasIssues ? `<span class="tag warn">有异常</span>` : `<span class="tag ok">正常</span>`}
+      </div>
+      <div class="card-metrics">
+        <div class="metric"><div class="metric-val">${num(a.domainTotal)}</div><div class="metric-lbl">域名</div></div>
+        <div class="metric"><div class="metric-val">${num(a.workers)}</div><div class="metric-lbl">Workers</div></div>
+        <div class="metric"><div class="metric-val">${num(a.pagesProjects)}</div><div class="metric-lbl">Pages</div></div>
+      </div>
+      <div class="card-mini">
+        <span class="mini">DNS <b>${num(a.dnsRecords)}</b></span>
+        <span class="mini">资产合计 <b>${num(a.totalAssets)}</b></span>
+      </div>
+    </div>`).join("");
+}
+
+/* ---------------- 后台总览 ---------------- */
 async function loadHome() {
   const data = await api("/api/assets/overview");
   state.overview = data.overview || {};
@@ -134,7 +216,7 @@ function renderStats() {
   const o = state.overview;
   const totalAssets = ["zones", "dnsRecords", "workers", "workerRoutes", "pagesProjects",
     "pagesDomains", "r2Buckets", "d1Databases", "kvNamespaces"]
-    .reduce((sum, k) => sum + Number(o[k] || 0), 0);
+    .reduce((s, k) => s + Number(o[k] || 0), 0);
   const values = [o.profiles, o.zones, o.workers, o.pagesProjects, totalAssets, o.openIssues];
   $("statStrip").innerHTML = STATS.map((label, i) => `
     <div class="stat">
@@ -146,18 +228,12 @@ function renderStats() {
 function renderCards() {
   const q = $("cardFilter").value.trim().toLowerCase();
   const list = state.summaries.filter((p) =>
-    !q ||
-    p.name.toLowerCase().includes(q) ||
-    p.accountId.toLowerCase().includes(q) ||
-    (p.note || "").toLowerCase().includes(q),
-  );
+    !q || p.name.toLowerCase().includes(q) || p.accountId.toLowerCase().includes(q) || (p.note || "").toLowerCase().includes(q));
   $("cardCount").textContent = String(list.length);
-
   if (!list.length) {
     $("cardGrid").innerHTML = empty(state.summaries.length ? "没有匹配的账号。" : "还没有账号，去「账号管理」添加一个。");
     return;
   }
-
   $("cardGrid").innerHTML = list.map(cardHtml).join("");
   document.querySelectorAll("[data-card]").forEach((el) => {
     el.addEventListener("click", () => openDetail(el.dataset.card).catch(showError));
@@ -181,20 +257,17 @@ function cardHtml(p) {
         ${c.openIssues > 0 ? `<span class="tag warn">${c.openIssues} 异常</span>` : `<span class="tag ok">正常</span>`}
       </div>
       <div class="card-note">${esc(p.note || p.emailHint || "—")}</div>
-
       <div class="card-metrics">
         <div class="metric"><div class="metric-val">${num(p.domainTotal)}</div><div class="metric-lbl">域名</div></div>
         <div class="metric"><div class="metric-val">${num(c.workers)}</div><div class="metric-lbl">Workers</div></div>
         <div class="metric"><div class="metric-val">${num(c.pagesProjects)}</div><div class="metric-lbl">Pages</div></div>
       </div>
-
       <div class="card-mini">
         <span class="mini">DNS <b>${num(c.dnsRecords)}</b></span>
         <span class="mini">R2 <b>${num(c.r2Buckets)}</b></span>
         <span class="mini">D1 <b>${num(c.d1Databases)}</b></span>
         <span class="mini">KV <b>${num(c.kvNamespaces)}</b></span>
       </div>
-
       <div class="card-foot">
         <span>资产合计 <b style="color:var(--text)">${num(p.totalAssets)}</b></span>
         <span>同步 ${relTime(p.latestSyncFinishedAt || p.lastSyncAt)}</span>
@@ -208,13 +281,10 @@ async function openDetail(profileId) {
   if (profile) state.detailProfile = profile;
   go("detail");
   $("detailHero").innerHTML = `<div class="empty">加载中…</div>`;
-  $("detailKpis").innerHTML = "";
-  $("assetTabs").innerHTML = "";
-  $("assetTable").innerHTML = "";
+  $("detailKpis").innerHTML = ""; $("assetTabs").innerHTML = ""; $("assetTable").innerHTML = "";
 
   state.detail = await api(`/api/assets/profiles/${profileId}`);
   if (!state.detailProfile) {
-    // 兜底：从汇总刷新
     try { const d = await api("/api/assets/overview"); state.summaries = d.profileSummaries || []; } catch {}
     state.detailProfile = state.summaries.find((p) => p.id === profileId) || null;
   }
@@ -222,8 +292,7 @@ async function openDetail(profileId) {
 }
 
 function renderDetail() {
-  const p = state.detailProfile;
-  const d = state.detail;
+  const p = state.detailProfile, d = state.detail;
   if (!p) { $("detailHero").innerHTML = empty("账号信息缺失。"); return; }
   const st = p.enabled ? (p.latestSyncStatus || p.status || "unknown") : "disabled";
 
@@ -253,7 +322,6 @@ function renderDetail() {
   ];
   $("detailKpis").innerHTML = kpis.map(([v, l]) => `<div class="kpi"><div class="kpi-val">${num(v)}</div><div class="kpi-lbl">${l}</div></div>`).join("");
 
-  // 默认选第一个有数据的 tab
   if (!(d[state.assetTab] || []).length) {
     const first = ASSET_TABS.find(([k]) => (d[k] || []).length);
     state.assetTab = first ? first[0] : "zones";
@@ -267,9 +335,7 @@ function renderAssetTabs() {
     const n = (d[key] || []).length;
     return `<button class="asset-tab ${key === state.assetTab ? "active" : ""}" data-tab="${key}" type="button">${label}<span class="n">${n}</span></button>`;
   }).join("");
-  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
-    state.assetTab = b.dataset.tab; renderAssetTabs();
-  }));
+  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { state.assetTab = b.dataset.tab; renderAssetTabs(); }));
   $("assetTable").innerHTML = table(state.detail[state.assetTab] || []);
 }
 
@@ -296,7 +362,7 @@ async function runSearch() {
 /* ---------------- 同步 ---------------- */
 async function loadSync() {
   const jobs = await api("/api/sync/jobs");
-  if (!jobs.length) { $("syncJobs").innerHTML = empty("还没有同步任务。"); }
+  if (!jobs.length) $("syncJobs").innerHTML = empty("还没有同步任务。");
   else $("syncJobs").innerHTML = tableWrap(jobs, [
     ["状态", (r) => html(statusBadge(r.status))],
     ["范围", (r) => r.scope],
@@ -305,9 +371,7 @@ async function loadSync() {
     ["开始", (r) => relTime(r.started_at)],
     ["", (r) => html(`<button class="btn xs" data-job="${esc(r.id)}" type="button">错误</button>`)],
   ]);
-  document.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", (e) => {
-    e.stopPropagation(); loadJobErrors(b.dataset.job).catch(showError);
-  }));
+  document.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); loadJobErrors(b.dataset.job).catch(showError); }));
   if (!$("syncErrors").innerHTML.trim()) $("syncErrors").innerHTML = empty("选择一个任务查看错误。");
 }
 
@@ -322,13 +386,11 @@ async function syncAll() {
   showNotice(`已排队 ${r.syncJobIds?.length ?? 0} 个同步任务。`);
   go("sync");
 }
-
 async function syncProfile(id) {
   const r = await api(`/api/profiles/${id}/sync`, { method: "POST" });
   showNotice(`已排队同步任务 ${r.syncJobId}。`);
   go("sync");
 }
-
 async function testProfile(id) {
   const checks = await api(`/api/profiles/${id}/test`, { method: "POST" });
   showNotice(`权限检查：${checks.map((c) => `${c.checkKey}:${c.status}`).join("，")}`);
@@ -367,7 +429,6 @@ async function loadManage() {
         <button class="btn xs" data-m-toggle="${esc(p.id)}" data-en="${p.enabled ? 1 : 0}" type="button">${p.enabled ? "停用" : "启用"}</button>
       </div>
     </div>`).join("");
-
   document.querySelectorAll("[data-m-view]").forEach((b) => b.addEventListener("click", () => openDetail(b.dataset.mView).catch(showError)));
   document.querySelectorAll("[data-m-test]").forEach((b) => b.addEventListener("click", () => testProfile(b.dataset.mTest).catch(showError)));
   document.querySelectorAll("[data-m-sync]").forEach((b) => b.addEventListener("click", () => syncProfile(b.dataset.mSync).catch(showError)));
@@ -398,8 +459,7 @@ function table(rows) {
     "project_name", "check_key", "status", "result", "account_id", "last_seen_at", "updated_at"];
   const keys = preferred.filter((k) => Object.prototype.hasOwnProperty.call(rows[0], k));
   const cols = (keys.length ? keys : Object.keys(rows[0]).slice(0, 7)).map((k) => [
-    humanize(k),
-    (row) => /_at$/.test(k) ? relTime(row[k]) : (row[k] ?? "—"),
+    humanize(k), (row) => /_at$/.test(k) ? relTime(row[k]) : (row[k] ?? "—"),
   ]);
   return tableWrap(rows, cols);
 }
@@ -430,8 +490,7 @@ function relTime(value) {
   if (!value) return "从未";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  const diff = Date.now() - d.getTime();
-  const min = Math.floor(diff / 60000);
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
   if (min < 1) return "刚刚";
   if (min < 60) return `${min} 分钟前`;
   const h = Math.floor(min / 60);
@@ -442,10 +501,7 @@ function relTime(value) {
 }
 
 function humanize(k) { return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
-
-function esc(v) {
-  return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+function esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 function showNotice(msg) { const n = $("notice"); n.textContent = msg; n.classList.remove("hidden"); }
 function hideNotice() { $("notice").classList.add("hidden"); }

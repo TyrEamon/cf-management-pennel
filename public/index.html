@@ -12,7 +12,7 @@
   </script>
   <link rel="stylesheet" href="/assets/app.css">
 </head>
-<body>
+<body data-auth="public">
   <div id="app" class="app">
     <!-- 顶栏 -->
     <header class="topbar">
@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <nav class="topnav" aria-label="主导航">
+      <nav class="topnav admin-only" aria-label="主导航">
         <button class="navlink active" data-nav="home" type="button">总览</button>
         <button class="navlink" data-nav="search" type="button">搜索</button>
         <button class="navlink" data-nav="sync" type="button">同步</button>
@@ -38,10 +38,10 @@
           <button id="themeDark" class="theme-btn" type="button" title="夜间">☾</button>
         </div>
         <button id="refreshBtn" class="icon-btn" type="button" title="刷新">↻</button>
-        <div class="lock" id="lockArea">
-          <span id="sessionDot" class="dot locked"></span>
-          <input id="adminToken" class="token-input" type="password" autocomplete="current-password" placeholder="Admin Token">
-          <button id="unlockBtn" class="btn primary sm" type="button">解锁</button>
+        <button id="loginBtn" class="btn primary sm public-only" type="button">登录后台</button>
+        <div class="session admin-only">
+          <span class="dot unlocked" title="已登录"></span>
+          <button id="logoutBtn" class="btn sm" type="button">退出</button>
         </div>
       </div>
     </header>
@@ -49,9 +49,16 @@
     <div id="notice" class="notice hidden" role="status"></div>
 
     <main class="content">
-      <!-- ============ 总览 ============ -->
+      <!-- ============ 总览（前台/后台共用，按登录态切换内容） ============ -->
       <section id="view-home" class="view active">
-        <div class="page-head">
+        <div class="page-head public-only">
+          <div>
+            <h1>资产总览 <span class="badge-public">公开</span></h1>
+            <p class="muted">仅展示各账号的资产<strong>数量汇总</strong>；登录后台可查看具体域名、项目等明细并进行控制。</p>
+          </div>
+          <button class="btn primary public-login" type="button">登录后台 →</button>
+        </div>
+        <div class="page-head admin-only">
           <div>
             <h1>账号总览</h1>
             <p class="muted">每个 Cloudflare 账号一张卡片，点击进入详情查看全部资产。</p>
@@ -61,10 +68,15 @@
 
         <div id="statStrip" class="stat-strip"></div>
 
-        <div class="search-bar">
+        <div class="search-bar admin-only">
           <span class="search-icon">⌕</span>
           <input id="cardFilter" type="search" placeholder="筛选账号：名称、Account ID、备注…">
           <button id="globalSearchFromHome" class="btn ghost sm" type="button">全局资源搜索 →</button>
+        </div>
+
+        <div class="lockbar public-only">
+          <span class="lock-ico">🔒</span>
+          <span>账号名已打码，明细需登录后台查看。</span>
         </div>
 
         <div class="section-row">
@@ -73,7 +85,7 @@
         <div id="cardGrid" class="card-grid"></div>
       </section>
 
-      <!-- ============ 账号详情 ============ -->
+      <!-- ============ 账号详情（后台） ============ -->
       <section id="view-detail" class="view">
         <button class="back-link" data-nav="home" type="button">← 返回总览</button>
         <div id="detailHero" class="detail-hero"></div>
@@ -84,7 +96,7 @@
         </div>
       </section>
 
-      <!-- ============ 全局搜索 ============ -->
+      <!-- ============ 全局搜索（后台） ============ -->
       <section id="view-search" class="view">
         <div class="page-head"><div><h1>全局搜索</h1><p class="muted">域名、DNS、Worker、Pages、R2、D1、KV 资源。</p></div></div>
         <div class="search-bar big">
@@ -98,7 +110,7 @@
         </div>
       </section>
 
-      <!-- ============ 同步任务 ============ -->
+      <!-- ============ 同步任务（后台） ============ -->
       <section id="view-sync" class="view">
         <div class="page-head">
           <div><h1>同步任务</h1><p class="muted">队列、进行中、部分失败与完成的任务。</p></div>
@@ -114,7 +126,7 @@
         </div>
       </section>
 
-      <!-- ============ 异常 ============ -->
+      <!-- ============ 异常（后台） ============ -->
       <section id="view-issues" class="view">
         <div class="page-head"><div><h1>异常</h1><p class="muted">权限、同步与关系检查发现的问题。</p></div></div>
         <div class="panel">
@@ -123,7 +135,7 @@
         </div>
       </section>
 
-      <!-- ============ 账号管理 ============ -->
+      <!-- ============ 账号管理（后台） ============ -->
       <section id="view-manage" class="view">
         <div class="page-head"><div><h1>账号管理</h1><p class="muted">添加账号、测试 Token 权限、触发同步。</p></div></div>
         <div class="manage-grid">
@@ -148,6 +160,23 @@
       </section>
     </main>
   </div>
+
+  <!-- 登录弹窗 -->
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="modal-backdrop" data-login-close></div>
+    <div class="modal-card">
+      <div class="modal-mark">CF</div>
+      <h2 id="loginTitle">登录后台</h2>
+      <p class="muted">输入管理口令以查看完整资产明细并进行控制。</p>
+      <input id="loginInput" class="modal-input" type="password" autocomplete="current-password" placeholder="管理口令">
+      <div id="loginError" class="login-error hidden"></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-login-close>取消</button>
+        <button id="loginSubmit" class="btn primary" type="button">登录</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/assets/app.js" defer></script>
 </body>
 </html>

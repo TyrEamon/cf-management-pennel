@@ -6,6 +6,7 @@ import { assetsRoute } from "./routes/assets";
 import { healthRoute } from "./routes/health";
 import { issuesRoute } from "./routes/issues";
 import { profilesRoute } from "./routes/profiles";
+import { publicRoute } from "./routes/public";
 import { searchRoute } from "./routes/search";
 import { syncRoute } from "./routes/sync";
 import { syncProfile } from "./scanner/profile-scanner";
@@ -19,6 +20,7 @@ type AppBindings = {
 const app = new Hono<AppBindings>();
 
 app.route("/api/health", healthRoute);
+app.route("/api/public", publicRoute);
 app.use("/api/*", adminAuth);
 app.route("/api/profiles", profilesRoute);
 app.route("/api/sync", syncRoute);
