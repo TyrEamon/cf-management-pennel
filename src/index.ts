@@ -7,6 +7,7 @@ import { healthRoute } from "./routes/health";
 import { issuesRoute } from "./routes/issues";
 import { profilesRoute } from "./routes/profiles";
 import { publicRoute } from "./routes/public";
+import { settingsRoute } from "./routes/settings";
 import { searchRoute } from "./routes/search";
 import { syncRoute } from "./routes/sync";
 import { syncProfile } from "./scanner/profile-scanner";
@@ -27,6 +28,7 @@ app.route("/api/sync", syncRoute);
 app.route("/api/search", searchRoute);
 app.route("/api/assets", assetsRoute);
 app.route("/api/issues", issuesRoute);
+app.route("/api/settings", settingsRoute);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

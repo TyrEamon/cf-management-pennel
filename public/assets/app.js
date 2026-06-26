@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bind();
   applyTheme(localStorage.getItem("cfah_theme") || "light");
   applyAppearance();
+  loadPublicAppearance().catch(() => {});
   if (state.token) {
     // 验证已存口令是否仍有效，否则回落到前台
     tryToken(state.token).catch(() => enterPublic());
@@ -88,12 +89,66 @@ function bind() {
 /* ---------------- 外观设置 ---------------- */
 const APPEARANCE_KEY = "cfah_appearance";
 const APPEARANCE_DEFAULT = { image: "", imgOpacity: 100, maskOpacity: 45, cardOpacity: 100 };
-let appearance = { ...APPEARANCE_DEFAULT, ...readAppearance() };
+let appearance = normalizeAppearance(readAppearance());
+let appearanceSaveTimer = null;
 
 function readAppearance() {
   try { return JSON.parse(localStorage.getItem(APPEARANCE_KEY) || "{}"); } catch { return {}; }
 }
-function saveAppearance() { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); }
+
+function normalizeAppearance(value) {
+  const v = value && typeof value === "object" ? value : {};
+  return {
+    image: typeof v.image === "string" ? v.image : APPEARANCE_DEFAULT.image,
+    imgOpacity: clampNumber(v.imgOpacity, 0, 100, APPEARANCE_DEFAULT.imgOpacity),
+    maskOpacity: clampNumber(v.maskOpacity, 0, 100, APPEARANCE_DEFAULT.maskOpacity),
+    cardOpacity: clampNumber(v.cardOpacity, 30, 100, APPEARANCE_DEFAULT.cardOpacity),
+  };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function setAppearance(value, { keepLocalOnly = false } = {}) {
+  appearance = normalizeAppearance(value);
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance));
+  applyAppearance();
+  if (!keepLocalOnly) queueCloudAppearanceSave();
+}
+
+function saveAppearance() {
+  appearance = normalizeAppearance(appearance);
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance));
+  queueCloudAppearanceSave();
+}
+
+function queueCloudAppearanceSave() {
+  if (!state.authed) return;
+  clearTimeout(appearanceSaveTimer);
+  appearanceSaveTimer = setTimeout(() => {
+    saveCloudAppearance().catch((e) => showNotice(`外观已临时保存在本地，D1 保存失败：${e.message}`));
+  }, 400);
+}
+
+async function saveCloudAppearance() {
+  if (!state.authed) return;
+  const saved = await api("/api/settings/appearance", { method: "PUT", body: JSON.stringify(appearance) });
+  appearance = normalizeAppearance(saved);
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance));
+}
+
+async function loadPublicAppearance() {
+  const saved = await publicGet("/api/public/appearance");
+  setAppearance(saved, { keepLocalOnly: true });
+}
+
+async function loadCloudAppearance() {
+  const saved = await api("/api/settings/appearance");
+  setAppearance(saved, { keepLocalOnly: true });
+}
 
 function applyAppearance() {
   const root = document.documentElement;
@@ -122,7 +177,7 @@ function syncAppearanceControls() {
 }
 
 function resetAppearance() {
-  appearance = { ...APPEARANCE_DEFAULT };
+  appearance = normalizeAppearance(APPEARANCE_DEFAULT);
   applyAppearance();
   saveAppearance();
 }
@@ -168,6 +223,7 @@ async function tryToken(token) {
   state.authed = true;
   state.overview = data.overview || {};
   state.summaries = data.profileSummaries || [];
+  await loadCloudAppearance().catch(() => {});
   enterAdmin();
 }
 

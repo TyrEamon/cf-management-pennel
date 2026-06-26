@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { AssetsRepository } from "../repositories/assets.repo";
 import { ProfileSummariesRepository } from "../repositories/profile-summaries.repo";
+import { SettingsRepository } from "../repositories/settings.repo";
+import { APPEARANCE_SETTING_KEY, normalizeAppearance } from "../settings/appearance";
 
 type AppBindings = {
   Bindings: Env;
@@ -30,6 +32,13 @@ publicRoute.get("/overview", async (c) => {
   }));
 
   return c.json({ data: { overview, accounts } });
+});
+
+publicRoute.get("/appearance", async (c) => {
+  const stored = await new SettingsRepository(c.env.DB).getJson<unknown>(
+    APPEARANCE_SETTING_KEY,
+  );
+  return c.json({ data: normalizeAppearance(stored) });
 });
 
 function maskName(name: string): string {
