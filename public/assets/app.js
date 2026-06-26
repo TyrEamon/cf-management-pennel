@@ -18,6 +18,7 @@ const state = {
 };
 
 const CARD_COLUMNS_KEY = "cfah_card_columns";
+const DESKTOP_COLUMN_WIDTHS = { auto: "1680px", 3: "1180px", 4: "1500px", 5: "1880px" };
 let cardColumnPrefs = readCardColumnPrefs();
 
 const ASSET_TABS = [
@@ -217,6 +218,11 @@ function currentColumnMode() {
   return isMobileColumns() ? "mobile" : "desktop";
 }
 
+function columnZoneWidth(value, mode) {
+  if (mode === "mobile") return "100%";
+  return DESKTOP_COLUMN_WIDTHS[value] || DESKTOP_COLUMN_WIDTHS.auto;
+}
+
 function setCardColumns(value) {
   const mode = currentColumnMode();
   cardColumnPrefs = {
@@ -232,6 +238,8 @@ function applyCardColumns() {
   if (!grid) return;
   const mode = currentColumnMode();
   const value = validColumnValue(cardColumnPrefs[mode], mode === "mobile");
+  const zone = $("cardListZone");
+  if (zone) zone.style.setProperty("--card-zone-width", columnZoneWidth(value, mode));
   if (value === "auto") {
     grid.removeAttribute("data-columns");
     grid.style.removeProperty("--card-columns");

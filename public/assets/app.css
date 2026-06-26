@@ -5,6 +5,7 @@
   --orange: #f6821f;
   --orange-soft: rgba(246, 130, 31, 0.12);
   --layout-width: 1680px;
+  --card-zone-width: 1680px;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
@@ -205,8 +206,9 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 
 /* ---------- 账号卡片 ---------- */
 .card-list-zone {
-  width: min(calc(100vw - 48px), var(--layout-width));
-  margin-left: calc((100% - min(calc(100vw - 48px), var(--layout-width))) / 2);
+  width: min(calc(100vw - 48px), var(--card-zone-width));
+  margin-left: calc((100% - min(calc(100vw - 48px), var(--card-zone-width))) / 2);
+  transition: width .2s ease, margin-left .2s ease;
 }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
 .card-grid[data-columns] { grid-template-columns: repeat(var(--card-columns), minmax(0, 1fr)); }
