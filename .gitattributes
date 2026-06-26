@@ -1,0 +1,10 @@
+# 统一换行符为 LF，消除 Windows 上的 CRLF 警告
+* text=auto eol=lf
+
+# 二进制/生成文件不处理
+package-lock.json -text
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

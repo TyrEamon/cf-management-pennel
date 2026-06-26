@@ -23,6 +23,7 @@
     {
       "binding": "DB",
       "database_name": "cf-asset-hub-db",
+      // ⚠️ 部署前替换为 `wrangler d1 create cf-asset-hub-db` 输出的真实 ID（见 DEPLOY.md）
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
