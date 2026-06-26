@@ -24,8 +24,6 @@ const CHILD_TABLES = [
   "sync_jobs",
   "profile_permission_checks",
   "cf_accounts",
-  "dns_records",
-  "worker_routes",
   "zones",
   "workers",
   "pages_domains",
@@ -187,4 +185,3 @@ export function toPublicProfile(row: ProfileRow): PublicProfile {
     updatedAt: row.updated_at,
   };
 }
-

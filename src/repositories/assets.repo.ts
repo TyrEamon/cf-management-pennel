@@ -1,8 +1,6 @@
 import { sha256Hex } from "../shared/ids";
 import {
   asObject,
-  getBoolean,
-  getNumber,
   getString,
   stringifyJson,
   type JsonObject,
@@ -20,22 +18,6 @@ export type ZoneAsset = {
   raw: unknown;
 };
 
-export type DnsRecordAsset = {
-  id: string;
-  profileId: string;
-  accountId: string;
-  zoneId: string;
-  zoneName: string;
-  type: string;
-  name: string;
-  content: string | null;
-  proxied: boolean | null;
-  ttl: number | null;
-  priority: number | null;
-  comment: string | null;
-  raw: unknown;
-};
-
 export type WorkerAsset = {
   id: string;
   profileId: string;
@@ -43,17 +25,6 @@ export type WorkerAsset = {
   name: string;
   createdOn: string | null;
   modifiedOn: string | null;
-  raw: unknown;
-};
-
-export type WorkerRouteAsset = {
-  id: string;
-  profileId: string;
-  accountId: string;
-  zoneId: string;
-  zoneName: string;
-  pattern: string;
-  scriptName: string | null;
   raw: unknown;
 };
 
@@ -108,9 +79,7 @@ export type KvNamespaceAsset = {
 
 type ResourceTable =
   | "zones"
-  | "dns_records"
   | "workers"
-  | "worker_routes"
   | "pages_projects"
   | "pages_domains"
   | "r2_buckets"
@@ -189,51 +158,6 @@ export class AssetsRepository {
       .run();
   }
 
-  async upsertDnsRecord(record: DnsRecordAsset): Promise<void> {
-    const now = new Date().toISOString();
-    await this.db
-      .prepare(
-        `INSERT INTO dns_records (
-          id, profile_id, account_id, zone_id, zone_name, type, name, content,
-          proxied, ttl, priority, comment, raw_json, first_seen_at, last_seen_at,
-          deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-        ON CONFLICT(id) DO UPDATE SET
-          profile_id = excluded.profile_id,
-          account_id = excluded.account_id,
-          zone_id = excluded.zone_id,
-          zone_name = excluded.zone_name,
-          type = excluded.type,
-          name = excluded.name,
-          content = excluded.content,
-          proxied = excluded.proxied,
-          ttl = excluded.ttl,
-          priority = excluded.priority,
-          comment = excluded.comment,
-          raw_json = excluded.raw_json,
-          last_seen_at = excluded.last_seen_at,
-          deleted_at = NULL`,
-      )
-      .bind(
-        record.id,
-        record.profileId,
-        record.accountId,
-        record.zoneId,
-        record.zoneName,
-        record.type,
-        record.name,
-        record.content,
-        record.proxied === null ? null : record.proxied ? 1 : 0,
-        record.ttl,
-        record.priority,
-        record.comment,
-        stringifyJson(record.raw),
-        now,
-        now,
-      )
-      .run();
-  }
-
   async upsertWorker(worker: WorkerAsset): Promise<void> {
     const now = new Date().toISOString();
     await this.db
@@ -260,40 +184,6 @@ export class AssetsRepository {
         worker.createdOn,
         worker.modifiedOn,
         stringifyJson(worker.raw),
-        now,
-        now,
-      )
-      .run();
-  }
-
-  async upsertWorkerRoute(route: WorkerRouteAsset): Promise<void> {
-    const now = new Date().toISOString();
-    await this.db
-      .prepare(
-        `INSERT INTO worker_routes (
-          id, profile_id, account_id, zone_id, zone_name, pattern, script_name,
-          raw_json, first_seen_at, last_seen_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-        ON CONFLICT(id) DO UPDATE SET
-          profile_id = excluded.profile_id,
-          account_id = excluded.account_id,
-          zone_id = excluded.zone_id,
-          zone_name = excluded.zone_name,
-          pattern = excluded.pattern,
-          script_name = excluded.script_name,
-          raw_json = excluded.raw_json,
-          last_seen_at = excluded.last_seen_at,
-          deleted_at = NULL`,
-      )
-      .bind(
-        route.id,
-        route.profileId,
-        route.accountId,
-        route.zoneId,
-        route.zoneName,
-        route.pattern,
-        route.scriptName,
-        stringifyJson(route.raw),
         now,
         now,
       )
@@ -489,9 +379,7 @@ export class AssetsRepository {
     const tables = [
       ["profiles", "profiles"],
       ["zones", "zones"],
-      ["dns_records", "dnsRecords"],
       ["workers", "workers"],
-      ["worker_routes", "workerRoutes"],
       ["pages_projects", "pagesProjects"],
       ["pages_domains", "pagesDomains"],
       ["r2_buckets", "r2Buckets"],
@@ -540,34 +428,6 @@ export async function zoneFromCf(
   };
 }
 
-export function dnsFromCf(
-  raw: JsonObject,
-  profileId: string,
-  accountId: string,
-  zoneId: string,
-  zoneName: string,
-): DnsRecordAsset | null {
-  const id = getString(raw, "id");
-  const type = getString(raw, "type");
-  const name = getString(raw, "name");
-  if (!id || !type || !name) return null;
-  return {
-    id,
-    profileId,
-    accountId,
-    zoneId,
-    zoneName,
-    type,
-    name,
-    content: getString(raw, "content"),
-    proxied: getBoolean(raw, "proxied"),
-    ttl: getNumber(raw, "ttl"),
-    priority: getNumber(raw, "priority"),
-    comment: getString(raw, "comment"),
-    raw,
-  };
-}
-
 export async function workerFromCf(
   raw: JsonObject,
   profileId: string,
@@ -582,28 +442,6 @@ export async function workerFromCf(
     name,
     createdOn: getString(raw, "created_on") ?? getString(raw, "createdOn"),
     modifiedOn: getString(raw, "modified_on") ?? getString(raw, "modifiedOn"),
-    raw,
-  };
-}
-
-export async function workerRouteFromCf(
-  raw: JsonObject,
-  profileId: string,
-  accountId: string,
-  zoneId: string,
-  zoneName: string,
-): Promise<WorkerRouteAsset | null> {
-  const pattern = getString(raw, "pattern");
-  if (!pattern) return null;
-  const id = getString(raw, "id") ?? `route_${await sha256Hex(`${zoneId}:${pattern}`)}`;
-  return {
-    id,
-    profileId,
-    accountId,
-    zoneId,
-    zoneName,
-    pattern,
-    scriptName: getString(raw, "script") ?? getString(raw, "script_name"),
     raw,
   };
 }
@@ -705,4 +543,3 @@ export function kvNamespaceFromCf(
     raw,
   };
 }
-

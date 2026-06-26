@@ -55,20 +55,10 @@ const resourceConfigs: Record<string, ResourceConfig> = {
     labelColumn: "name",
     subtitleExpression: "'Zone'",
   },
-  dns_record: {
-    table: "dns_records",
-    labelColumn: "name",
-    subtitleExpression: "type || COALESCE(' -> ' || content, '')",
-  },
   worker: {
     table: "workers",
     labelColumn: "name",
     subtitleExpression: "'Worker script'",
-  },
-  worker_route: {
-    table: "worker_routes",
-    labelColumn: "pattern",
-    subtitleExpression: "COALESCE(script_name, 'Worker route')",
   },
   pages_project: {
     table: "pages_projects",
@@ -175,7 +165,7 @@ export class AssetGraphRepository {
     const like = `%${normalized}%`;
     const cappedLimit = limitForGraph(limit);
     const profileClause = profileId ? "AND profile_id = ?" : "";
-    const seedValues = [like, normalized, like, like, like, normalized, like, like];
+    const seedValues = [normalized, like, normalized, like];
     const binds: Array<string | number> = profileId
       ? [...seedValues.flatMap((value) => [value, profileId]), cappedLimit]
       : [...seedValues, cappedLimit];
@@ -186,16 +176,12 @@ export class AssetGraphRepository {
          FROM asset_links
          LEFT JOIN profiles ON profiles.id = asset_links.profile_id
          WHERE source_id IN (
-           SELECT id FROM dns_records WHERE lower(name) LIKE ? ${profileClause}
-           UNION SELECT id FROM zones WHERE lower(name) = ? ${profileClause}
+           SELECT id FROM zones WHERE lower(name) = ? ${profileClause}
            UNION SELECT id FROM pages_domains WHERE lower(domain_name) LIKE ? ${profileClause}
-           UNION SELECT id FROM worker_routes WHERE lower(pattern) LIKE ? ${profileClause}
          )
          OR target_id IN (
-           SELECT id FROM dns_records WHERE lower(name) LIKE ? ${profileClause}
-           UNION SELECT id FROM zones WHERE lower(name) = ? ${profileClause}
+           SELECT id FROM zones WHERE lower(name) = ? ${profileClause}
            UNION SELECT id FROM pages_domains WHERE lower(domain_name) LIKE ? ${profileClause}
-           UNION SELECT id FROM worker_routes WHERE lower(pattern) LIKE ? ${profileClause}
          )
          ORDER BY confidence DESC, updated_at DESC
          LIMIT ?`,
@@ -308,8 +294,8 @@ function fallbackNode(
     key: graphKey(type, id),
     id,
     type,
-    label: type === "tunnel_hint" ? "Cloudflare Tunnel hint" : id,
-    subtitle: type === "tunnel_hint" ? id.replace(/^tunnel_/, "tunnel_") : humanType(type),
+    label: id,
+    subtitle: humanType(type),
     profileId,
     profileName,
   };

@@ -4,13 +4,11 @@ import { decryptToken } from "../crypto/token-crypto";
 import {
   AssetsRepository,
   d1DatabaseFromCf,
-  dnsFromCf,
   kvNamespaceFromCf,
   pagesDomainFromCf,
   pagesProjectFromCf,
   r2BucketFromCf,
   workerFromCf,
-  workerRouteFromCf,
   zoneFromCf,
 } from "../repositories/assets.repo";
 import { ProfileRepository } from "../repositories/profiles.repo";
@@ -20,9 +18,7 @@ import type { ProfileRow } from "../types";
 
 export type AssetSyncSummary = {
   zones: number;
-  dnsRecords: number;
   workers: number;
-  workerRoutes: number;
   pagesProjects: number;
   pagesDomains: number;
   r2Buckets: number;
@@ -78,20 +74,9 @@ export async function syncAssetsForProfile(
     raw: { source: "profile" },
   });
 
-  let zones: ZoneRef[] = [];
   await runModule(context, "zones", "zones.list", async () => {
-    zones = await syncZones(context);
+    await syncZones(context);
   });
-
-  if (zones.length > 0) {
-    await runModule(context, "dns_records", "dns.list", async () => {
-      await syncDnsRecords(context, zones);
-    });
-    await runModule(context, "worker_routes", "workers.routes.list", async () => {
-      await syncWorkerRoutes(context, zones);
-    });
-  }
-
   await runModule(context, "workers", "workers.scripts.list", async () => {
     await syncWorkers(context);
   });
@@ -133,54 +118,6 @@ async function syncZones(context: ScannerContext): Promise<ZoneRef[]> {
 
   await context.assets.markMissingDeleted("zones", context.profile.id, syncStartedAt);
   return zones;
-}
-
-async function syncDnsRecords(context: ScannerContext, zones: ZoneRef[]): Promise<void> {
-  const syncStartedAt = new Date().toISOString();
-  for (const zone of zones) {
-    const records = await context.client.listDnsRecords(zone.id);
-    for (const rawRecord of records) {
-      const record = dnsFromCf(
-        asObject(rawRecord),
-        context.profile.id,
-        context.profile.account_id,
-        zone.id,
-        zone.name,
-      );
-      if (!record) continue;
-      await context.assets.upsertDnsRecord(record);
-      context.summary.dnsRecords += 1;
-    }
-  }
-  await context.assets.markMissingDeleted(
-    "dns_records",
-    context.profile.id,
-    syncStartedAt,
-  );
-}
-
-async function syncWorkerRoutes(context: ScannerContext, zones: ZoneRef[]): Promise<void> {
-  const syncStartedAt = new Date().toISOString();
-  for (const zone of zones) {
-    const routes = await context.client.listWorkerRoutes(zone.id);
-    for (const rawRoute of routes) {
-      const route = await workerRouteFromCf(
-        asObject(rawRoute),
-        context.profile.id,
-        context.profile.account_id,
-        zone.id,
-        zone.name,
-      );
-      if (!route) continue;
-      await context.assets.upsertWorkerRoute(route);
-      context.summary.workerRoutes += 1;
-    }
-  }
-  await context.assets.markMissingDeleted(
-    "worker_routes",
-    context.profile.id,
-    syncStartedAt,
-  );
 }
 
 async function syncWorkers(context: ScannerContext): Promise<void> {
@@ -386,9 +323,7 @@ function errorInfo(error: unknown): {
 function emptySummary(): AssetSyncSummary {
   return {
     zones: 0,
-    dnsRecords: 0,
     workers: 0,
-    workerRoutes: 0,
     pagesProjects: 0,
     pagesDomains: 0,
     r2Buckets: 0,
@@ -397,4 +332,3 @@ function emptySummary(): AssetSyncSummary {
     errors: 0,
   };
 }
-

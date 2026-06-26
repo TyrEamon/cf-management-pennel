@@ -1,8 +1,6 @@
 type ResourceTable =
   | "zones"
-  | "dns_records"
   | "workers"
-  | "worker_routes"
   | "pages_projects"
   | "pages_domains"
   | "r2_buckets"
@@ -22,9 +20,7 @@ type ProfileSummaryRow = {
   created_at: string;
   updated_at: string;
   zones: number;
-  dns_records: number;
   workers: number;
-  worker_routes: number;
   pages_projects: number;
   pages_domains: number;
   r2_buckets: number;
@@ -50,9 +46,7 @@ export type ProfileAssetSummary = {
   updatedAt: string;
   counts: {
     zones: number;
-    dnsRecords: number;
     workers: number;
-    workerRoutes: number;
     pagesProjects: number;
     pagesDomains: number;
     r2Buckets: number;
@@ -87,9 +81,7 @@ export class ProfileSummariesRepository {
           profiles.created_at,
           profiles.updated_at,
           COALESCE(zones.count, 0) AS zones,
-          COALESCE(dns_records.count, 0) AS dns_records,
           COALESCE(workers.count, 0) AS workers,
-          COALESCE(worker_routes.count, 0) AS worker_routes,
           COALESCE(pages_projects.count, 0) AS pages_projects,
           COALESCE(pages_domains.count, 0) AS pages_domains,
           COALESCE(r2_buckets.count, 0) AS r2_buckets,
@@ -101,9 +93,7 @@ export class ProfileSummariesRepository {
           latest_sync.finished_at AS latest_sync_finished_at
          FROM profiles
          LEFT JOIN (${resourceCountSql("zones")}) zones ON zones.profile_id = profiles.id
-         LEFT JOIN (${resourceCountSql("dns_records")}) dns_records ON dns_records.profile_id = profiles.id
          LEFT JOIN (${resourceCountSql("workers")}) workers ON workers.profile_id = profiles.id
-         LEFT JOIN (${resourceCountSql("worker_routes")}) worker_routes ON worker_routes.profile_id = profiles.id
          LEFT JOIN (${resourceCountSql("pages_projects")}) pages_projects ON pages_projects.profile_id = profiles.id
          LEFT JOIN (${resourceCountSql("pages_domains")}) pages_domains ON pages_domains.profile_id = profiles.id
          LEFT JOIN (${resourceCountSql("r2_buckets")}) r2_buckets ON r2_buckets.profile_id = profiles.id
@@ -137,9 +127,7 @@ function resourceCountSql(table: ResourceTable): string {
 function toProfileAssetSummary(row: ProfileSummaryRow): ProfileAssetSummary {
   const counts = {
     zones: Number(row.zones ?? 0),
-    dnsRecords: Number(row.dns_records ?? 0),
     workers: Number(row.workers ?? 0),
-    workerRoutes: Number(row.worker_routes ?? 0),
     pagesProjects: Number(row.pages_projects ?? 0),
     pagesDomains: Number(row.pages_domains ?? 0),
     r2Buckets: Number(row.r2_buckets ?? 0),
@@ -149,9 +137,7 @@ function toProfileAssetSummary(row: ProfileSummaryRow): ProfileAssetSummary {
   };
   const totalAssets =
     counts.zones +
-    counts.dnsRecords +
     counts.workers +
-    counts.workerRoutes +
     counts.pagesProjects +
     counts.pagesDomains +
     counts.r2Buckets +

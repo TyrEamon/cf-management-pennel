@@ -1,10 +1,10 @@
-import { CloudflareApiError, type CloudflareErrorKind } from "../cf/errors";
 import { CloudflareClient, type CfRecord } from "../cf/cf-client";
+import { CloudflareApiError, type CloudflareErrorKind } from "../cf/errors";
 import { decryptToken } from "../crypto/token-crypto";
 import { PermissionChecksRepository } from "../repositories/permission-checks.repo";
 import { ProfileRepository } from "../repositories/profiles.repo";
-import type { PermissionCheckResult, PermissionStatus, ProfileRow } from "../types";
 import { getString } from "../shared/record";
+import type { PermissionCheckResult, PermissionStatus, ProfileRow } from "../types";
 
 export async function runAndStorePermissionChecks(
   env: Env,
@@ -45,7 +45,6 @@ export async function runPermissionChecks(
   );
   const client = new CloudflareClient(env, token);
   const checks: PermissionCheckResult[] = [];
-  let zones: CfRecord[] = [];
   let pagesProjects: CfRecord[] = [];
 
   checks.push(
@@ -56,31 +55,10 @@ export async function runPermissionChecks(
 
   checks.push(
     await check("zones.list", async () => {
-      zones = await client.listZones();
+      const zones = await client.listZones();
       return zones.length === 0 ? "empty_resource" : "ok";
     }),
   );
-
-  const firstZoneId = getString(zones[0] ?? {}, "id");
-  if (firstZoneId) {
-    checks.push(
-      await check("dns.list", async () => {
-        const dnsRecords = await client.listDnsRecords(firstZoneId);
-        return dnsRecords.length === 0 ? "empty_resource" : "ok";
-      }),
-    );
-    checks.push(
-      await check("workers.routes.list", async () => {
-        const routes = await client.listWorkerRoutes(firstZoneId);
-        return routes.length === 0 ? "empty_resource" : "ok";
-      }),
-    );
-  } else {
-    checks.push(empty("dns.list", "No zones available for DNS check"));
-    checks.push(
-      empty("workers.routes.list", "No zones available for Workers Routes check"),
-    );
-  }
 
   checks.push(
     await check("workers.scripts.list", async () => {

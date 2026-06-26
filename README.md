@@ -19,7 +19,8 @@ D:\Desktop\cf-asset-hub
 - Queue / Cron 同步入口
 - Profile 管理与 token 加密
 - Cloudflare 权限检测
-- Zones / DNS / Workers / Routes / Pages / R2 / D1 / KV 扫描落库
+- Zones / Workers / Pages / R2 / D1 / KV 扫描落库
+- 隐私保护：不采集、不展示 DNS 记录和 Worker 路由，避免源站 IP 等敏感信息入库
 - 搜索索引
 - 资源关系推断
 - 异常检查
@@ -34,7 +35,8 @@ v0.1-CF 先做 Cloudflare 原生部署的只读资产盘点：
 - 添加 Cloudflare Profile
 - 加密保存 API Token
 - 检测 token 权限
-- 同步 Zones / DNS / Workers / Pages / R2 / D1 / KV
+- 同步 Zones / Workers / Pages / R2 / D1 / KV
+- DNS 记录和 Worker 路由默认不采集、不展示
 - 全局搜索资源属于哪个账号
 - 记录同步状态和错误
 
@@ -128,14 +130,7 @@ Domain Detail -> Relation Graph
 关系推断覆盖：
 
 ```text
-zone -> dns_record
-zone -> worker_route
-dns_record -> worker_route
-worker_route -> worker
 pages_domain -> pages_project
-pages_domain -> dns_record
-dns_record -> pages_project
-dns_record -> tunnel_hint
 ```
 
 ## 验证记录

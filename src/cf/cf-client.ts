@@ -42,21 +42,9 @@ export class CloudflareClient {
     return this.listAll<CfRecord>("/zones");
   }
 
-  listDnsRecords(zoneId: string): Promise<CfRecord[]> {
-    return this.listAll<CfRecord>(
-      `/zones/${encodeURIComponent(zoneId)}/dns_records`,
-    );
-  }
-
   listWorkerScripts(accountId: string): Promise<CfRecord[]> {
     return this.listAll<CfRecord>(
       `/accounts/${encodeURIComponent(accountId)}/workers/scripts`,
-    );
-  }
-
-  listWorkerRoutes(zoneId: string): Promise<CfRecord[]> {
-    return this.listAll<CfRecord>(
-      `/zones/${encodeURIComponent(zoneId)}/workers/routes`,
     );
   }
 
@@ -77,9 +65,9 @@ export class CloudflareClient {
   }
 
   listR2Buckets(accountId: string): Promise<CfRecord[]> {
-    return this.listAll<CfRecord>(
+    return this.request<{ buckets?: unknown }>(
       `/accounts/${encodeURIComponent(accountId)}/r2/buckets`,
-    );
+    ).then((result) => toRecordArray(result.buckets));
   }
 
   listD1Databases(accountId: string): Promise<CfRecord[]> {
@@ -107,8 +95,10 @@ export class CloudflareClient {
       const params = options.includePerPage === false
         ? `page=${page}`
         : `page=${page}&per_page=50`;
-      const response = await this.request<T[]>(`${path}${separator}${params}`);
-      results.push(...response);
+      const response = await this.request<unknown>(
+        `${path}${separator}${params}`,
+      );
+      results.push(...toRecordArray(response) as T[]);
 
       const lastMeta = this.lastResultInfo;
       totalPages = lastMeta?.total_pages ?? page;
@@ -230,6 +220,20 @@ function retryAfterMs(response: Response): number | null {
   if (!value) return null;
   const seconds = Number.parseInt(value, 10);
   return Number.isFinite(seconds) ? seconds * 1000 : null;
+}
+
+function toRecordArray(value: unknown): CfRecord[] {
+  if (!Array.isArray(value)) {
+    throw new CloudflareApiError(
+      "Cloudflare API response result was not a list",
+      "parse_error",
+    );
+  }
+  return value.filter(isRecord);
+}
+
+function isRecord(value: unknown): value is CfRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function sleep(ms: number): Promise<void> {

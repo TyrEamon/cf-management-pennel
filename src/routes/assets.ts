@@ -58,7 +58,7 @@ assetsRoute.get("/zones", async (c) => {
 
 assetsRoute.get("/zones/:id", async (c) => {
   const zoneId = c.req.param("id");
-  const [zone, dnsRecords, workerRoutes, links, graph] = await Promise.all([
+  const [zone, links, graph] = await Promise.all([
     c.env.DB
       .prepare(
         `SELECT zones.*, profiles.name AS profile_name
@@ -68,26 +68,6 @@ assetsRoute.get("/zones/:id", async (c) => {
       )
       .bind(zoneId)
       .first(),
-    c.env.DB
-      .prepare(
-        `SELECT dns_records.*, profiles.name AS profile_name
-         FROM dns_records
-         LEFT JOIN profiles ON profiles.id = dns_records.profile_id
-         WHERE dns_records.zone_id = ? AND dns_records.deleted_at IS NULL
-         ORDER BY dns_records.name ASC, dns_records.type ASC`,
-      )
-      .bind(zoneId)
-      .all(),
-    c.env.DB
-      .prepare(
-        `SELECT worker_routes.*, profiles.name AS profile_name
-         FROM worker_routes
-         LEFT JOIN profiles ON profiles.id = worker_routes.profile_id
-         WHERE worker_routes.zone_id = ? AND worker_routes.deleted_at IS NULL
-         ORDER BY worker_routes.pattern ASC`,
-      )
-      .bind(zoneId)
-      .all(),
     c.env.DB
       .prepare(
         `SELECT asset_links.*
@@ -105,8 +85,6 @@ assetsRoute.get("/zones/:id", async (c) => {
   return c.json({
     data: {
       zone,
-      dnsRecords: dnsRecords.results,
-      workerRoutes: workerRoutes.results,
       links: links.results,
       graph,
     },
@@ -115,12 +93,10 @@ assetsRoute.get("/zones/:id", async (c) => {
 
 assetsRoute.get("/profiles/:id", async (c) => {
   const profileId = c.req.param("id");
-  const [zones, dnsRecords, workers, workerRoutes, pagesProjects, pagesDomains, r2, d1, kv] =
+  const [zones, workers, pagesProjects, pagesDomains, r2, d1, kv] =
     await Promise.all([
       list(c.env.DB, "zones", profileId),
-      list(c.env.DB, "dns_records", profileId),
       list(c.env.DB, "workers", profileId),
-      list(c.env.DB, "worker_routes", profileId),
       list(c.env.DB, "pages_projects", profileId),
       list(c.env.DB, "pages_domains", profileId),
       list(c.env.DB, "r2_buckets", profileId),
@@ -135,9 +111,7 @@ assetsRoute.get("/profiles/:id", async (c) => {
     data: {
       permissionChecks,
       zones,
-      dnsRecords,
       workers,
-      workerRoutes,
       pagesProjects,
       pagesDomains,
       r2Buckets: r2,
@@ -150,7 +124,7 @@ assetsRoute.get("/profiles/:id", async (c) => {
 assetsRoute.get("/domains/:name", async (c) => {
   const domain = c.req.param("name").toLowerCase();
   const like = `%${domain}%`;
-  const [zones, dnsRecords, workerRoutes, pagesDomains, links, graph] = await Promise.all([
+  const [zones, pagesDomains, links, graph] = await Promise.all([
     c.env.DB
       .prepare(
         `SELECT zones.*, profiles.name AS profile_name
@@ -159,26 +133,6 @@ assetsRoute.get("/domains/:name", async (c) => {
          WHERE lower(zones.name) = ? AND zones.deleted_at IS NULL`,
       )
       .bind(domain)
-      .all(),
-    c.env.DB
-      .prepare(
-        `SELECT dns_records.*, profiles.name AS profile_name
-         FROM dns_records
-         LEFT JOIN profiles ON profiles.id = dns_records.profile_id
-         WHERE lower(dns_records.name) LIKE ? AND dns_records.deleted_at IS NULL
-         ORDER BY dns_records.name ASC`,
-      )
-      .bind(like)
-      .all(),
-    c.env.DB
-      .prepare(
-        `SELECT worker_routes.*, profiles.name AS profile_name
-         FROM worker_routes
-         LEFT JOIN profiles ON profiles.id = worker_routes.profile_id
-         WHERE lower(worker_routes.pattern) LIKE ? AND worker_routes.deleted_at IS NULL
-         ORDER BY worker_routes.pattern ASC`,
-      )
-      .bind(like)
       .all(),
     c.env.DB
       .prepare(
@@ -195,20 +149,16 @@ assetsRoute.get("/domains/:name", async (c) => {
         `SELECT asset_links.*
          FROM asset_links
          WHERE source_id IN (
-           SELECT id FROM dns_records WHERE lower(name) LIKE ?
-           UNION SELECT id FROM zones WHERE lower(name) = ?
+           SELECT id FROM zones WHERE lower(name) = ?
            UNION SELECT id FROM pages_domains WHERE lower(domain_name) LIKE ?
-           UNION SELECT id FROM worker_routes WHERE lower(pattern) LIKE ?
          )
          OR target_id IN (
-           SELECT id FROM dns_records WHERE lower(name) LIKE ?
-           UNION SELECT id FROM zones WHERE lower(name) = ?
+           SELECT id FROM zones WHERE lower(name) = ?
            UNION SELECT id FROM pages_domains WHERE lower(domain_name) LIKE ?
-           UNION SELECT id FROM worker_routes WHERE lower(pattern) LIKE ?
          )
          ORDER BY confidence DESC`,
       )
-      .bind(like, domain, like, like, like, domain, like, like)
+      .bind(domain, like, domain, like)
       .all(),
     new AssetGraphRepository(c.env.DB).graph({ domain, limit: 160 }),
   ]);
@@ -217,8 +167,6 @@ assetsRoute.get("/domains/:name", async (c) => {
     data: {
       domain,
       zones: zones.results,
-      dnsRecords: dnsRecords.results,
-      workerRoutes: workerRoutes.results,
       pagesDomains: pagesDomains.results,
       links: links.results,
       graph,

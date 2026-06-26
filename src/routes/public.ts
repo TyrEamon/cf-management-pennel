@@ -26,7 +26,6 @@ publicRoute.get("/overview", async (c) => {
     domainTotal: p.domainTotal,
     workers: p.counts.workers,
     pagesProjects: p.counts.pagesProjects,
-    dnsRecords: p.counts.dnsRecords,
     totalAssets: p.totalAssets,
     hasIssues: p.counts.openIssues > 0,
   }));

@@ -18,7 +18,7 @@ const state = {
 };
 
 const ASSET_TABS = [
-  ["zones", "域名"], ["dnsRecords", "DNS"], ["workers", "Workers"], ["workerRoutes", "路由"],
+  ["zones", "域名"], ["workers", "Workers"],
   ["pagesProjects", "Pages"], ["r2Buckets", "R2"],
   ["d1Databases", "D1"], ["kvNamespaces", "KV"], ["permissionChecks", "权限"],
 ];
@@ -319,7 +319,7 @@ function renderPublicCards(accounts) {
         <div class="metric"><div class="metric-val">${num(a.pagesProjects)}</div><div class="metric-lbl">Pages</div></div>
       </div>
       <div class="card-mini">
-        <span class="mini">DNS <b>${num(a.dnsRecords)}</b></span>
+        <span class="mini">R2 / D1 / KV 已纳入统计</span>
         <span class="mini">资产合计 <b>${num(a.totalAssets)}</b></span>
       </div>
     </div>`).join("");
@@ -336,7 +336,7 @@ async function loadHome() {
 
 function renderStats() {
   const o = state.overview;
-  const totalAssets = ["zones", "dnsRecords", "workers", "workerRoutes", "pagesProjects",
+  const totalAssets = ["zones", "workers", "pagesProjects",
     "pagesDomains", "r2Buckets", "d1Databases", "kvNamespaces"]
     .reduce((s, k) => s + Number(o[k] || 0), 0);
   const values = [o.profiles, o.zones, o.workers, o.pagesProjects, totalAssets, o.openIssues];
@@ -385,7 +385,6 @@ function cardHtml(p, i = 0) {
         <div class="metric"><div class="metric-val">${num(c.pagesProjects)}</div><div class="metric-lbl">Pages</div></div>
       </div>
       <div class="card-mini">
-        <span class="mini">DNS <b>${num(c.dnsRecords)}</b></span>
         <span class="mini">R2 <b>${num(c.r2Buckets)}</b></span>
         <span class="mini">D1 <b>${num(c.d1Databases)}</b></span>
         <span class="mini">KV <b>${num(c.kvNamespaces)}</b></span>
@@ -439,7 +438,7 @@ function renderDetail() {
 
   const c = p.counts;
   const kpis = [
-    [p.domainTotal, "域名"], [c.dnsRecords, "DNS 记录"], [c.workers, "Workers"], [c.workerRoutes, "路由"],
+    [p.domainTotal, "域名"], [c.workers, "Workers"],
     [c.pagesProjects, "Pages"], [c.r2Buckets, "R2"], [c.d1Databases, "D1"], [c.kvNamespaces, "KV"],
   ];
   $("detailKpis").innerHTML = kpis.map(([v, l]) => `<div class="kpi"><div class="kpi-val">${num(v)}</div><div class="kpi-lbl">${l}</div></div>`).join("");
@@ -458,7 +457,8 @@ function renderAssetTabs() {
     return `<button class="asset-tab ${key === state.assetTab ? "active" : ""}" data-tab="${key}" type="button">${label}<span class="n">${n}</span></button>`;
   }).join("");
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { state.assetTab = b.dataset.tab; renderAssetTabs(); }));
-  $("assetTable").innerHTML = table(state.detail[state.assetTab] || []);
+  const rows = state.detail[state.assetTab] || [];
+  $("assetTable").innerHTML = state.assetTab === "permissionChecks" ? permissionTable(rows) : table(rows);
 }
 
 /* ---------------- 搜索 ---------------- */
@@ -634,6 +634,25 @@ function table(rows) {
     humanize(k), (row) => /_at$/.test(k) ? relTime(row[k]) : (row[k] ?? "—"),
   ]);
   return tableWrap(rows, cols);
+}
+
+function permissionTable(rows) {
+  if (!rows || !rows.length) return empty("暂无权限检测数据。");
+  return tableWrap(rows, [
+    ["检查项", (r) => r.check_key],
+    ["状态", (r) => html(statusBadge(r.status))],
+    ["HTTP", (r) => r.http_status || "—"],
+    ["错误码", (r) => r.error_code || "—"],
+    ["说明", (r) => r.message || permissionHint(r)],
+    ["检测时间", (r) => relTime(r.checked_at)],
+  ]);
+}
+
+function permissionHint(row) {
+  if (row.status === "permission_denied") return "Token 缺少对应权限或权限层级不匹配";
+  if (row.status === "network_error") return "请求或返回解析失败";
+  if (row.status === "empty_resource") return "接口可访问，但没有找到资源";
+  return "—";
 }
 
 function tableWrap(rows, cols, rowAttr) {

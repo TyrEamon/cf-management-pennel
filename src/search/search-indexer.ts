@@ -8,9 +8,7 @@ export class SearchIndexer {
       .run();
 
     await this.insertZones(profileId);
-    await this.insertDns(profileId);
     await this.insertWorkers(profileId);
-    await this.insertWorkerRoutes(profileId);
     await this.insertPagesProjects(profileId);
     await this.insertPagesDomains(profileId);
     await this.insertR2(profileId);
@@ -27,31 +25,12 @@ export class SearchIndexer {
     ).bind(now(), profileId).run();
   }
 
-  private async insertDns(profileId: string): Promise<void> {
-    await this.db.prepare(
-      `INSERT INTO search_index (id, profile_id, resource_type, resource_id, title, subtitle, search_text, updated_at)
-       SELECT 'search_dns_' || id, profile_id, 'dns_record', id, name,
-              type || ' ' || coalesce(content, ''),
-              lower(name || ' ' || type || ' ' || coalesce(content, '') || ' ' || zone_name), ?
-       FROM dns_records WHERE profile_id = ? AND deleted_at IS NULL`,
-    ).bind(now(), profileId).run();
-  }
-
   private async insertWorkers(profileId: string): Promise<void> {
     await this.db.prepare(
       `INSERT INTO search_index (id, profile_id, resource_type, resource_id, title, subtitle, search_text, updated_at)
        SELECT 'search_worker_' || id, profile_id, 'worker', id, name, account_id,
               lower(name || ' ' || account_id), ?
        FROM workers WHERE profile_id = ? AND deleted_at IS NULL`,
-    ).bind(now(), profileId).run();
-  }
-
-  private async insertWorkerRoutes(profileId: string): Promise<void> {
-    await this.db.prepare(
-      `INSERT INTO search_index (id, profile_id, resource_type, resource_id, title, subtitle, search_text, updated_at)
-       SELECT 'search_route_' || id, profile_id, 'worker_route', id, pattern, coalesce(script_name, ''),
-              lower(pattern || ' ' || coalesce(script_name, '') || ' ' || zone_name), ?
-       FROM worker_routes WHERE profile_id = ? AND deleted_at IS NULL`,
     ).bind(now(), profileId).run();
   }
 
@@ -104,4 +83,3 @@ export class SearchIndexer {
 function now(): string {
   return new Date().toISOString();
 }
-
