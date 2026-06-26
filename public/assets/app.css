@@ -64,11 +64,11 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 .brand { display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
 .brand-mark {
   width: 38px; height: 38px; border-radius: 11px;
-  background: linear-gradient(135deg, var(--orange), #fbad41);
-  color: #fff; font-weight: 800; font-size: 15px;
-  display: grid; place-items: center;
-  box-shadow: 0 4px 12px rgba(246,130,31,0.35);
+  display: block; flex: none; object-fit: cover;
+  box-shadow: 0 4px 12px rgba(246,130,31,0.28);
+  transition: transform .18s ease, box-shadow .18s ease;
 }
+.brand:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(246,130,31,0.34); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
 .brand-name { font-weight: 700; font-size: 15px; }
 .brand-sub { font-size: 11px; color: var(--text-3); }
