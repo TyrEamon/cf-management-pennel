@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cf-asset-hub",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "CLOUDFLARE_API_BASE_URL": "https://api.cloudflare.com/client/v4",
+    "CF_API_MIN_DELAY_MS": "250",
+    "CF_API_MAX_RETRIES": "3"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cf-asset-hub-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SYNC_QUEUE",
+        "queue": "cf-asset-hub-sync"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "cf-asset-hub-sync",
+        "max_batch_size": 5,
+        "max_batch_timeout": 30
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["0 */6 * * *"]
+  }
+}

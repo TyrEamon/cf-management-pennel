@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloudflare 资产中心</title>
+  <script>
+    (function () {
+      var theme = localStorage.getItem("cfah_theme") || "light";
+      document.documentElement.dataset.theme = theme === "dark" ? "dark" : "light";
+    })();
+  </script>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <!-- 顶栏 -->
+    <header class="topbar">
+      <div class="brand" data-nav="home" role="button" tabindex="0">
+        <div class="brand-mark">CF</div>
+        <div class="brand-text">
+          <span class="brand-name">资产中心</span>
+          <span class="brand-sub">多账号盘点台</span>
+        </div>
+      </div>
+
+      <nav class="topnav" aria-label="主导航">
+        <button class="navlink active" data-nav="home" type="button">总览</button>
+        <button class="navlink" data-nav="search" type="button">搜索</button>
+        <button class="navlink" data-nav="sync" type="button">同步</button>
+        <button class="navlink" data-nav="issues" type="button">异常</button>
+        <button class="navlink" data-nav="manage" type="button">账号管理</button>
+      </nav>
+
+      <div class="topbar-actions">
+        <div class="theme-toggle" role="group" aria-label="主题">
+          <button id="themeLight" class="theme-btn" type="button" title="日间">☀</button>
+          <button id="themeDark" class="theme-btn" type="button" title="夜间">☾</button>
+        </div>
+        <button id="refreshBtn" class="icon-btn" type="button" title="刷新">↻</button>
+        <div class="lock" id="lockArea">
+          <span id="sessionDot" class="dot locked"></span>
+          <input id="adminToken" class="token-input" type="password" autocomplete="current-password" placeholder="Admin Token">
+          <button id="unlockBtn" class="btn primary sm" type="button">解锁</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="notice" class="notice hidden" role="status"></div>
+
+    <main class="content">
+      <!-- ============ 总览 ============ -->
+      <section id="view-home" class="view active">
+        <div class="page-head">
+          <div>
+            <h1>账号总览</h1>
+            <p class="muted">每个 Cloudflare 账号一张卡片，点击进入详情查看全部资产。</p>
+          </div>
+          <button id="syncAllHome" class="btn" type="button">同步全部</button>
+        </div>
+
+        <div id="statStrip" class="stat-strip"></div>
+
+        <div class="search-bar">
+          <span class="search-icon">⌕</span>
+          <input id="cardFilter" type="search" placeholder="筛选账号：名称、Account ID、备注…">
+          <button id="globalSearchFromHome" class="btn ghost sm" type="button">全局资源搜索 →</button>
+        </div>
+
+        <div class="section-row">
+          <h2>账号 <span id="cardCount" class="count">0</span></h2>
+        </div>
+        <div id="cardGrid" class="card-grid"></div>
+      </section>
+
+      <!-- ============ 账号详情 ============ -->
+      <section id="view-detail" class="view">
+        <button class="back-link" data-nav="home" type="button">← 返回总览</button>
+        <div id="detailHero" class="detail-hero"></div>
+        <div id="detailKpis" class="kpi-strip"></div>
+        <div class="panel">
+          <div class="asset-tabs" id="assetTabs"></div>
+          <div id="assetTable" class="asset-table"></div>
+        </div>
+      </section>
+
+      <!-- ============ 全局搜索 ============ -->
+      <section id="view-search" class="view">
+        <div class="page-head"><div><h1>全局搜索</h1><p class="muted">域名、DNS、Worker、Pages、R2、D1、KV 资源。</p></div></div>
+        <div class="search-bar big">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" placeholder="example.com / worker-api / my-bucket / database…">
+          <button id="runSearch" class="btn primary sm" type="button">搜索</button>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>结果</h2><span id="searchCount" class="count">0</span></div>
+          <div id="searchResults"></div>
+        </div>
+      </section>
+
+      <!-- ============ 同步任务 ============ -->
+      <section id="view-sync" class="view">
+        <div class="page-head">
+          <div><h1>同步任务</h1><p class="muted">队列、进行中、部分失败与完成的任务。</p></div>
+          <button id="syncAllSync" class="btn" type="button">同步全部</button>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>任务列表</h2></div>
+          <div id="syncJobs"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>任务错误</h2><span id="selectedJobName" class="muted">选择一个任务</span></div>
+          <div id="syncErrors"></div>
+        </div>
+      </section>
+
+      <!-- ============ 异常 ============ -->
+      <section id="view-issues" class="view">
+        <div class="page-head"><div><h1>异常</h1><p class="muted">权限、同步与关系检查发现的问题。</p></div></div>
+        <div class="panel">
+          <div class="panel-head"><h2>未处理</h2><span id="issueCount" class="count">0</span></div>
+          <div id="issuesList"></div>
+        </div>
+      </section>
+
+      <!-- ============ 账号管理 ============ -->
+      <section id="view-manage" class="view">
+        <div class="page-head"><div><h1>账号管理</h1><p class="muted">添加账号、测试 Token 权限、触发同步。</p></div></div>
+        <div class="manage-grid">
+          <section class="panel">
+            <div class="panel-head"><h2>添加账号</h2><span class="chip">Token 加密保存</span></div>
+            <form id="profileForm" class="form">
+              <label>账号名称<input id="profileName" required placeholder="主账号 / 客户 A / 备用"></label>
+              <label>Account ID<input id="accountId" required placeholder="Cloudflare account id"></label>
+              <label>邮箱提示<input id="emailHint" type="email" placeholder="可选"></label>
+              <label>备注<input id="profileNote" placeholder="这个账号负责什么"></label>
+              <label class="wide">API Token<textarea id="apiToken" required placeholder="只读 Cloudflare API Token"></textarea></label>
+              <div class="form-actions">
+                <button class="btn primary" type="submit">添加账号</button>
+              </div>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>账号列表</h2><span id="manageCount" class="count">0</span></div>
+            <div id="manageList"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
