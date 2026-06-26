@@ -63,6 +63,7 @@ export class CloudflareClient {
   listPagesProjects(accountId: string): Promise<CfRecord[]> {
     return this.listAll<CfRecord>(
       `/accounts/${encodeURIComponent(accountId)}/pages/projects`,
+      { includePerPage: false },
     );
   }
 
@@ -71,6 +72,7 @@ export class CloudflareClient {
       `/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(
         projectName,
       )}/domains`,
+      { includePerPage: false },
     );
   }
 
@@ -92,16 +94,20 @@ export class CloudflareClient {
     );
   }
 
-  private async listAll<T extends CfRecord>(path: string): Promise<T[]> {
+  private async listAll<T extends CfRecord>(
+    path: string,
+    options: { includePerPage?: boolean } = {},
+  ): Promise<T[]> {
     const results: T[] = [];
     let page = 1;
     let totalPages = 1;
 
     do {
       const separator = path.includes("?") ? "&" : "?";
-      const response = await this.request<T[]>(
-        `${path}${separator}page=${page}&per_page=50`,
-      );
+      const params = options.includePerPage === false
+        ? `page=${page}`
+        : `page=${page}&per_page=50`;
+      const response = await this.request<T[]>(`${path}${separator}${params}`);
       results.push(...response);
 
       const lastMeta = this.lastResultInfo;
@@ -231,4 +237,3 @@ function sleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-
