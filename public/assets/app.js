@@ -60,6 +60,16 @@ function bind() {
     b.addEventListener("animationend", () => b.classList.remove("spinning"), { once: true });
     refresh().catch(showError);
   });
+  $("mobileMenuBtn").addEventListener("click", toggleMobileMenu);
+  document.querySelectorAll("[data-mobile-nav]").forEach((b) => b.addEventListener("click", () => { closeMobileMenu(); go(b.dataset.mobileNav); }));
+  document.querySelector("[data-mobile-login]").addEventListener("click", () => { closeMobileMenu(); openLogin(); });
+  document.querySelector("[data-mobile-logout]").addEventListener("click", () => { closeMobileMenu(); logout(); });
+  document.addEventListener("click", (e) => {
+    if ($("mobileMenu").classList.contains("hidden")) return;
+    if ($("mobileMenu").contains(e.target) || $("mobileMenuBtn").contains(e.target)) return;
+    closeMobileMenu();
+  });
+  window.matchMedia("(min-width: 881px)").addEventListener("change", closeMobileMenu);
 
   $("loginBtn").addEventListener("click", openLogin);
   document.querySelectorAll(".public-login").forEach((b) => b.addEventListener("click", openLogin));
@@ -269,6 +279,20 @@ function applyTheme(theme) {
   button.setAttribute("aria-label", button.title);
 }
 
+/* ---------------- 移动端菜单 ---------------- */
+function toggleMobileMenu() {
+  const menu = $("mobileMenu");
+  const open = menu.classList.toggle("hidden") === false;
+  $("mobileMenuBtn").setAttribute("aria-expanded", String(open));
+}
+
+function closeMobileMenu() {
+  const menu = $("mobileMenu");
+  if (!menu) return;
+  menu.classList.add("hidden");
+  $("mobileMenuBtn")?.setAttribute("aria-expanded", "false");
+}
+
 /* ---------------- 登录 / 退出 ---------------- */
 function openLogin() {
   $("loginError").classList.add("hidden");
@@ -325,9 +349,11 @@ function enterAdmin() {
 /* ---------------- 视图切换 ---------------- */
 function go(view) {
   if (!state.authed && view !== "home") { openLogin(); return; }
+  closeMobileMenu();
   state.view = view;
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
   document.querySelectorAll(".navlink").forEach((n) => n.classList.toggle("active", n.dataset.nav === view));
+  document.querySelectorAll("[data-mobile-nav]").forEach((n) => n.classList.toggle("active", n.dataset.mobileNav === view));
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (view === "home") { (state.authed ? loadHome() : loadPublic()).catch(showError); return; }

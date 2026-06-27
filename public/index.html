@@ -41,6 +41,7 @@
       <div class="topbar-actions">
         <button id="themeToggle" class="icon-btn theme-single" type="button" title="切换主题" aria-label="切换主题">☾</button>
         <button id="refreshBtn" class="icon-btn" type="button" title="刷新">↻</button>
+        <button id="mobileMenuBtn" class="icon-btn menu-btn" type="button" title="菜单" aria-label="打开菜单" aria-expanded="false">☰</button>
         <button id="loginBtn" class="btn primary sm public-only" type="button">登录后台</button>
         <div class="session admin-only">
           <span class="dot unlocked" title="已登录"></span>
@@ -48,6 +49,17 @@
         </div>
       </div>
     </header>
+
+    <div id="mobileMenu" class="mobile-menu hidden" role="menu" aria-label="移动端菜单">
+      <button class="mobile-menu-item admin-only" data-mobile-nav="home" type="button">总览</button>
+      <button class="mobile-menu-item admin-only" data-mobile-nav="search" type="button">搜索</button>
+      <button class="mobile-menu-item admin-only" data-mobile-nav="sync" type="button">同步</button>
+      <button class="mobile-menu-item admin-only" data-mobile-nav="issues" type="button">异常</button>
+      <button class="mobile-menu-item admin-only" data-mobile-nav="manage" type="button">账号管理</button>
+      <button class="mobile-menu-item admin-only" data-mobile-nav="appearance" type="button">外观</button>
+      <button class="mobile-menu-item public-only" data-mobile-login type="button">登录后台</button>
+      <button class="mobile-menu-item admin-only" data-mobile-logout type="button">退出登录</button>
+    </div>
 
     <div id="notice" class="notice hidden" role="status"></div>
 
